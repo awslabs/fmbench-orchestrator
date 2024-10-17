@@ -78,28 +78,6 @@ def _load_ami_mapping(file_path: str) -> Dict:
         config_data=None
     return config_data
 
-def _get_ami_id(instance_type: str, region: str, ami_mapping: Dict) -> str:
-    """
-    This function determines the ami id based on the instance type and region
-    """
-    ami_id: Optional[str]=None
-    try:
-        # Ensure the file exists
-        if not os.path.isfile(file_path):
-            logger.error(f"Invalid file path: {file_path}")
-            return None
-        logger.info(f"Reading configuration from: {file_path}")
-        ami_type = AMI_TYPE.NEURON if IS_NEURON_INSTANCE(instance_type) else AMI_TYPE.GPU
-        if instance_region in ami_mapping and ami_type in ami_mapping[instance_region]:
-            ami_id = ami_mapping[region][ami_type]
-        else:
-            logger.error(f"Region: {region} not provided in the {AMI_MAPPING_PARAM_NAME}.yml file.")
-            ami_id = None
-    except Exception as e:
-        logger.error(f"Error occurred while retrieving the AMI id: {e}")
-        ami_id = None
-    return ami_id
-
 
 def load_yaml_file(file_path: str) -> Dict:
     """
