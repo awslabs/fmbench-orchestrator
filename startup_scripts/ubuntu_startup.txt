@@ -73,12 +73,12 @@ fi
 
 # install triton inference server
 cd ~
-git clone https://github.com/triton-inference-server/tensorrtllm_backend.git  --branch v0.12.0
+git clone https://github.com/triton-inference-server/tensorrtllm_backend.git --branch v0.12.0
 # Update the submodules
 cd tensorrtllm_backend
 # Install git-lfs if needed
-sudo apt --fix-broken install
-sudo apt-get update && sudo apt-get install git-lfs -y --no-install-recommends
+sudo DEBIAN_FRONTEND=noninteractive apt-get update
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y git-lfs --no-install-recommends
 git lfs install
 git submodule update --init --recursive
 
