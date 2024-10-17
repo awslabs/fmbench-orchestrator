@@ -96,7 +96,7 @@ def load_yaml_file(file_path: str) -> Dict:
         # Ensure the file exists
         if not os.path.isfile(file_path):
             logger.error(f"Invalid file path: {file_path}")
-            return None
+            return
         logger.info(f"Reading configuration from: {file_path}")
         # Read the YAML file as plain text
         file_content = Path(file_path).read_text()
@@ -104,7 +104,7 @@ def load_yaml_file(file_path: str) -> Dict:
         global_region = get_region()
         if global_region is None:
             logger.error("Region could not be fetched.")
-            return None
+            return
         logger.info(f"Global region detected: {global_region}")
 
         # Load the YAML config temporarily to process mappings and instances
