@@ -39,7 +39,7 @@ key_pair_gen:
   #Need to change this name to something better?
   # This assumes that if key_pair_generation is false, you have the key pair stored in the root.
   # If so, change the file name to your KP name and the script will pick it up.
-  key_pair_name: fmbench_orchestrator_key_pair_newone_again-{region}
+  key_pair_name: fmbench_orchestrator_key_pair-{region}
 
 # all region specific AMI mapping information for gpu/neuron based instances
 # are given in this "ami_mapping.yml" file. This file currently contains information
