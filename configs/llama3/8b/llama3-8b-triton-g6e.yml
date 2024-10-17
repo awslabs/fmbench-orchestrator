@@ -98,7 +98,7 @@ instances:
   ebs_Iops: 16000
   ebs_VolumeSize: 250
   ebs_VolumeType: gp3
-  startup_script: startup_scripts/gpu_ubuntu_startup.txt
+  startup_script: startup_scripts/ubuntu_startup.txt
   post_startup_script: post_startup_scripts/fmbench.txt
   # Timeout period in Seconds before a run is stopped
   fmbench_complete_timeout: 2400
@@ -115,7 +115,7 @@ instances:
   ebs_Iops: 16000
   ebs_VolumeSize: 250
   ebs_VolumeType: gp3
-  startup_script: startup_scripts/gpu_ubuntu_startup.txt
+  startup_script: startup_scripts/ubuntu_startup.txt
   post_startup_script: post_startup_scripts/fmbench.txt
   # Timeout period in Seconds before a run is stopped
   fmbench_complete_timeout: 2400
@@ -132,7 +132,7 @@ instances:
   ebs_Iops: 16000
   ebs_VolumeSize: 250
   ebs_VolumeType: gp3
-  startup_script: startup_scripts/gpu_ubuntu_startup.txt
+  startup_script: startup_scripts/ubuntu_startup.txt
   post_startup_script: post_startup_scripts/fmbench.txt
   # Timeout period in Seconds before a run is stopped
   fmbench_complete_timeout: 2400
@@ -149,7 +149,7 @@ instances:
   ebs_Iops: 16000
   ebs_VolumeSize: 250
   ebs_VolumeType: gp3
-  startup_script: startup_scripts/gpu_ubuntu_startup.txt
+  startup_script: startup_scripts/ubuntu_startup.txt
   post_startup_script: post_startup_scripts/fmbench.txt
   # Timeout period in Seconds before a run is stopped
   fmbench_complete_timeout: 2400
@@ -167,7 +167,7 @@ instances:
   ebs_Iops: 16000
   ebs_VolumeSize: 250
   ebs_VolumeType: gp3
-  startup_script: startup_scripts/gpu_ubuntu_startup.txt
+  startup_script: startup_scripts/ubuntu_startup.txt
   post_startup_script: post_startup_scripts/fmbench.txt
   # Timeout period in Seconds before a run is stopped
   fmbench_complete_timeout: 2400
