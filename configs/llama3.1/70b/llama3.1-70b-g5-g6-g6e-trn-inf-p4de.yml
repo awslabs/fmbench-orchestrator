@@ -6,6 +6,8 @@ aws:
   # This is the path to the hf token file that contains your custom
   # hf token
   hf_token_fpath: /tmp/hf_token.txt
+  # AWS region, this parameter is templatized, no need to change
+  region: {region}
   
 # steps to run the fmbench orchestration
 # test. If all steps are set to yes, the security
@@ -37,7 +39,16 @@ key_pair_gen:
   #Need to change this name to something better?
   # This assumes that if key_pair_generation is false, you have the key pair stored in the root.
   # If so, change the file name to your KP name and the script will pick it up.
-  key_pair_name: fmbench_orchestrator_key_pair_new
+  key_pair_name: fmbench_orchestrator_key_pair_new-{region}
+
+# all region specific AMI mapping information for gpu/neuron based instances
+# are given in this "ami_mapping.yml" file. This file currently contains information
+# on us-east-1, us-east-2, us-west-1, us-west-2 for gpu and neuron instances. To add
+# or change the ami mapping for other regions, modify this file. This model benchmarking
+# configuration file will utilize the region (determined by the region metadata) or if the
+# user provides it in the model config to get the AMI mapping and launch the specific
+# instance accordingly.
+ami_mapping: ami_mapping.yml 
 
 #Instance follows the format below.
 #   instance_id: {instance_id_here} if Instance_id, then you need to bring your own private key
@@ -62,6 +73,7 @@ key_pair_gen:
 #   fmbench_config: https://raw.githubusercontent.com/dheerajoruganty/multi-deploy-ec2/refs/heads/main/configs/config-ec2-llama3-8b.yml
 
 ### OPTIONAL:
+#   region: {region_here} # override the global region using the region where you want to deploy that EC2 instance
 #   fmbench_llm_tokenizer_fpath: fmbench_llm_utils/tokenizer.json
 #   fmbench_llm_config_fpath: fmbench_llm_utils/config.json
 #   fmbench_tokenizer_remote_dir: /tmp/fmbench-read/llama3_tokenizer/
@@ -79,14 +91,13 @@ instances:
 # This is for g6e type instances
 - instance_type: g6e.24xlarge
   deploy: yes
-  region: us-west-2
-  ami_id: ami-0ed0fd5212e1c579b
+  ami_id: {ami-id}
   device_name: /dev/sda1
   ebs_del_on_termination: True
   ebs_Iops: 16000
   ebs_VolumeSize: 400
   ebs_VolumeType: gp3
-  startup_script: startup_scripts/gpu_ubuntu_startup.txt
+  startup_script: startup_scripts/ubuntu_startup.txt
   post_startup_script: post_startup_scripts/fmbench.txt
   # Timeout period in Seconds before a run is stopped
   fmbench_complete_timeout: 6000
@@ -94,14 +105,13 @@ instances:
 
 - instance_type: g6e.48xlarge
   deploy: yes
-  region: us-west-2
-  ami_id: ami-0ed0fd5212e1c579b
+  ami_id: {ami-id}
   device_name: /dev/sda1
   ebs_del_on_termination: True
   ebs_Iops: 16000
   ebs_VolumeSize: 400
   ebs_VolumeType: gp3
-  startup_script: startup_scripts/gpu_ubuntu_startup.txt
+  startup_script: startup_scripts/ubuntu_startup.txt
   post_startup_script: post_startup_scripts/fmbench.txt
   # Timeout period in Seconds before a run is stopped
   fmbench_complete_timeout: 6000
@@ -110,14 +120,13 @@ instances:
 # This is for the g6 instance. The only instance you can deploy a llama3.1 70b on a g6 is g6.48xl
 - instance_type: g6.48xlarge
   deploy: yes
-  region: us-west-2
-  ami_id: ami-0ed0fd5212e1c579b
+  ami_id: {ami-id}
   device_name: /dev/sda1
   ebs_del_on_termination: True
   ebs_Iops: 16000
   ebs_VolumeSize: 400
   ebs_VolumeType: gp3
-  startup_script: startup_scripts/gpu_ubuntu_startup.txt
+  startup_script: startup_scripts/ubuntu_startup.txt
   post_startup_script: post_startup_scripts/fmbench.txt
   # Timeout period in Seconds before a run is stopped
   fmbench_complete_timeout: 6000
@@ -126,14 +135,13 @@ instances:
 # This is for the g5 instance. The only instance you can deploy a llama3.1 70b on a g5 is g5.48xl
 - instance_type: g5.48xlarge
   deploy: yes
-  region: us-east-2
-  ami_id: ami-09748f93764b742d1
+  ami_id: {ami-id}
   device_name: /dev/sda1
   ebs_del_on_termination: True
   ebs_Iops: 16000
   ebs_VolumeSize: 400
   ebs_VolumeType: gp3
-  startup_script: startup_scripts/gpu_ubuntu_startup.txt
+  startup_script: startup_scripts/ubuntu_startup.txt
   post_startup_script: post_startup_scripts/fmbench.txt
   # Timeout period in Seconds before a run is stopped
   fmbench_complete_timeout: 6000
@@ -143,7 +151,7 @@ instances:
 - instance_type: p4de.24xlarge
   deploy: no 
   region: us-west-2
-  ami_id: ami-0ed0fd5212e1c579b
+  ami_id: {ami-id}
   device_name: /dev/sda1
   ebs_del_on_termination: True
   ebs_Iops: 16000
@@ -153,7 +161,7 @@ instances:
   CapacityReservationPreference: 
   CapacityReservationId: # enter your CR id here
   CapacityReservationResourceGroupArn:
-  startup_script: startup_scripts/gpu_ubuntu_startup.txt
+  startup_script: startup_scripts/ubuntu_startup.txt
   post_startup_script: post_startup_scripts/fmbench.txt
   # Timeout period in Seconds before a run is stopped
   fmbench_complete_timeout: 6000
@@ -162,14 +170,13 @@ instances:
 # This is for the trn1.32xlarge instance. This specific example is for triton + djl which gives the most optimal performance for llama3.1 70b on trn1.32xlarge
 - instance_type: trn1.32xlarge
   deploy: no
-  region: us-west-2 
-  ami_id: ami-084d4a2de05b27a18 
+  ami_id: {ami-id}
   device_name: /dev/sda1
   ebs_del_on_termination: True
   ebs_Iops: 16000
   ebs_VolumeSize: 600 # additional storage required to load the model, docker image, etc
   ebs_VolumeType: gp3
-  startup_script: startup_scripts/neuron_al2_startup_triton.txt
+  startup_script: startup_scripts/ubuntu_startup.txt
   post_startup_script: post_startup_scripts/fmbench.txt
   # Timeout period in Seconds before a run is stopped
   fmbench_complete_timeout: 6000
@@ -178,14 +185,13 @@ instances:
 # This is for the inf2.48xlarge instance. This specific example is for triton + djl which gives the most optimal performance for llama3.1 70b on inf2.48xlarge
 - instance_type: inf2.48xlarge
   deploy: yes
-  region: us-west-2
-  ami_id: ami-084d4a2de05b27a18
+  ami_id: {ami-id}
   device_name: /dev/sda1
   ebs_del_on_termination: True
   ebs_Iops: 16000
   ebs_VolumeSize: 600 # additional storage required to load the model, docker image, etc
   ebs_VolumeType: gp3
-  startup_script: startup_scripts/neuron_al2_startup_triton.txt
+  startup_script: startup_scripts/ubuntu_startup.txt
   post_startup_script: post_startup_scripts/fmbench.txt
   # Timeout period in Seconds before a run is stopped
   fmbench_complete_timeout: 6000
