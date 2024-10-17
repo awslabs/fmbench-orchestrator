@@ -149,7 +149,7 @@ instances:
 
 # This is for a capacity reservation type instance p4de.24xlarge
 - instance_type: p4de.24xlarge
-  deploy: no 
+  deploy: yes 
   region: us-west-2
   ami_id: {ami-id}
   device_name: /dev/sda1
@@ -169,7 +169,7 @@ instances:
 
 # This is for the trn1.32xlarge instance. This specific example is for triton + djl which gives the most optimal performance for llama3.1 70b on trn1.32xlarge
 - instance_type: trn1.32xlarge
-  deploy: no
+  deploy: yes
   ami_id: {ami-id}
   device_name: /dev/sda1
   ebs_del_on_termination: True
