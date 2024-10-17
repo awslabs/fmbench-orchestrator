@@ -6,46 +6,14 @@ import requests
 import paramiko
 from constants import *
 from typing import Tuple
-from utils import create_security_group, load_yaml_file, _get_ec2_hostname_and_username
-from utils import authorize_inbound_rules, create_key_pair
 from botocore.exceptions import NoCredentialsError, ClientError
+from utils import authorize_inbound_rules, create_key_pair, get_region
+from utils import create_security_group, load_yaml_file, _get_ec2_hostname_and_username
 
 # set a logger
 logger = logging.getLogger(__name__)
 
 config_data = {}
-
-
-def get_region() -> str:
-    try:
-        session = boto3.session.Session()
-        region_name = session.region_name
-        if region_name is None:
-            logger.info(
-                f"boto3.session.Session().region_name is {region_name}, "
-                f"going to use an metadata api to determine region name"
-            )
-            # THIS CODE ASSUMED WE ARE RUNNING ON EC2, for everything else
-            # the boto3 session should be sufficient to retrieve region name
-            resp = requests.put(
-                "http://169.254.169.254/latest/api/token",
-                headers={"X-aws-ec2-metadata-token-ttl-seconds": "21600"},
-            )
-            token = resp.text
-            region_name = requests.get(
-                "http://169.254.169.254/latest/meta-data/placement/region",
-                headers={"X-aws-ec2-metadata-token": token},
-            ).text
-            logger.info(
-                f"region_name={region_name}, also setting the AWS_DEFAULT_REGION env var"
-            )
-            os.environ["AWS_DEFAULT_REGION"] = region_name
-        logger.info(f"region_name={region_name}")
-    except Exception as e:
-        logger.error(f"Could not fetch the region: {e}")
-        region_name = None
-    return region_name
-
 
 def get_iam_role() -> str:
     try:
@@ -319,11 +287,8 @@ def get_key_pair(region):
     config_name = config_data["key_pair_gen"]["key_pair_name"]
 
     # Generate the key pair name using the format: config_name-region
-    key_pair_name = (
-        f"{config_name}-{region}"
-        if config_data["run_steps"]["key_pair_generation"]
-        else config_name
-    )
+    key_pair_name = config_name.format(region=region)
+    logger.info(f"Setting the key pair name as={key_pair_name}")
     private_key_fname = os.path.join(key_pair_dir, f"{key_pair_name}.pem")
 
     # Check if key pair generation is enabled

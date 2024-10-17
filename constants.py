@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Optional, List, Dict
 
 # Define constants
@@ -5,6 +6,12 @@ remote_script_path: str = "/home/ubuntu/run_fmbench.sh"
 YAML_FILE_PATH: str = "config.yml"
 DEFAULT_EC2_USERNAME: str = "ec2-user"
 BYO_DATASET_FILE_PATH: str = "/tmp/fmbench-read/source_data/"
+AWS_CHIPS_PREFIX_LIST: List[str] = ["inf2", "trn1"]
+IS_NEURON_INSTANCE = lambda instance_type: any([instance_type.startswith(p) for p in AWS_CHIPS_PREFIX_LIST])
+
+class AMI_TYPE(str, Enum):
+    NEURON = 'neuron'
+    GPU = "gpu"
 
 # Define a dictionary for common AMIs and their corresponding usernames
 AMI_USERNAME_MAP: Dict = {
@@ -20,6 +27,7 @@ EBS_VOLUME_TYPE: str = "gp3"
 CAPACITY_RESERVATION_PREFERENCE: str = "none"
 MIN_INSTANCE_COUNT: int = 1
 MAX_INSTANCE_COUNT: int = 1
+AMI_MAPPING_PARAM_NAME: str = 'ami_mapping'
 
 # FMBench results file path
 FMBENCH_RESULTS_FOLDER_PATTERN: str = "$HOME/results-*"

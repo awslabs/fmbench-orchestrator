@@ -222,7 +222,7 @@ if __name__ == "__main__":
                     f"deploy={deploy} for instance={json.dumps(instance, indent=2)}, skipping it..."
                 )
                 continue
-            region = instance["region"]
+            region = instance.get("region", globals.config_data["aws"].get('region'))
             startup_script = instance["startup_script"]
             logger.info(f"Region Set for instance is: {region}")
             if globals.config_data["run_steps"]["security_group_creation"]:
@@ -230,7 +230,10 @@ if __name__ == "__main__":
                     f"Creating Security Groups. getting them by name if they exist"
                 )
                 sg_id = get_sg_id(region)
-            PRIVATE_KEY_FNAME, PRIVATE_KEY_NAME = get_key_pair(region)
+            if region is not None:
+                PRIVATE_KEY_FNAME, PRIVATE_KEY_NAME = get_key_pair(region)
+            else:
+                logger.error(f"Region is not provided in the configuration file. Make sure the region exists. Region: {region}")
             # command_to_run = instance["command_to_run"]
             with open(f"{startup_script}", "r") as file:
                 user_data_script = file.read()
@@ -301,7 +304,7 @@ if __name__ == "__main__":
                         "fmbench_tokenizer_remote_dir"
                     ),
                     "fmbench_complete_timeout": instance["fmbench_complete_timeout"],
-                    "region": instance["region"],
+                    "region": instance.get("region", region),
                     "PRIVATE_KEY_FNAME": PRIVATE_KEY_FNAME,
                     "byo_dataset_fpath": instance.get("byo_dataset_fpath"),
                 }

@@ -25,25 +25,150 @@ logger = logging.getLogger(__name__)
 
 executor = ThreadPoolExecutor()
 
+def get_region() -> str:
+    try:
+        session = boto3.session.Session()
+        region_name = session.region_name
+        if region_name is None:
+            logger.info(
+                f"boto3.session.Session().region_name is {region_name}, "
+                f"going to use an metadata api to determine region name"
+            )
+            # THIS CODE ASSUMED WE ARE RUNNING ON EC2, for everything else
+            # the boto3 session should be sufficient to retrieve region name
+            resp = requests.put(
+                "http://169.254.169.254/latest/api/token",
+                headers={"X-aws-ec2-metadata-token-ttl-seconds": "21600"},
+            )
+            token = resp.text
+            region_name = requests.get(
+                "http://169.254.169.254/latest/meta-data/placement/region",
+                headers={"X-aws-ec2-metadata-token": token},
+            ).text
+            logger.info(
+                f"region_name={region_name}, also setting the AWS_DEFAULT_REGION env var"
+            )
+            os.environ["AWS_DEFAULT_REGION"] = region_name
+        logger.info(f"region_name={region_name}")
+    except Exception as e:
+        logger.error(f"Could not fetch the region: {e}")
+        region_name = None
+    return region_name
+
+def _load_ami_mapping(file_path: str) -> Dict:
+    """
+    Load and parse the AMI mapping YAML file.
+    Args:
+        file_path (str): The path to the AMI mapping YAML file.
+
+    Returns:
+        dict: The AMI mapping data.
+    """
+    config_data: Optional[Dict] = None
+    try:
+        if os.path.isfile(file_path):
+            with open(file_path, 'r') as file:
+                config_data = yaml.safe_load(file)
+                logger.info(f"AMI Mapping loaded: {json.dumps(config_data, indent=2)}")
+        else:
+            logger.error(f"AMI mapping file {file_path} does not exist.")
+            config_data=None
+    except Exception as e:
+        logger.error(f"Error loading AMI mapping file: {e}")
+        config_data=None
+    return config_data
+
+def _get_ami_id(instance_type: str, region: str, ami_mapping: Dict) -> str:
+    """
+    This function determines the ami id based on the instance type and region
+    """
+    ami_id: Optional[str]=None
+    try:
+        # Ensure the file exists
+        if not os.path.isfile(file_path):
+            logger.error(f"Invalid file path: {file_path}")
+            return None
+        logger.info(f"Reading configuration from: {file_path}")
+        ami_type = AMI_TYPE.NEURON if IS_NEURON_INSTANCE(instance_type) else AMI_TYPE.GPU
+        if instance_region in ami_mapping and ami_type in ami_mapping[instance_region]:
+            ami_id = ami_mapping[region][ami_type]
+        else:
+            logger.error(f"Region: {region} not provided in the {AMI_MAPPING_PARAM_NAME}.yml file.")
+            ami_id = None
+    except Exception as e:
+        logger.error(f"Error occurred while retrieving the AMI id: {e}")
+        ami_id = None
+    return ami_id
+
 
 def load_yaml_file(file_path: str) -> Dict:
     """
-    Load and parse a YAML file.
+    Load and parse a YAML file. This yaml file loads the config data
+    as well as the ami-mapping data and handles the region to be used 
+    while spinning up an EC2 instance
 
     Args:
         file_path (str): The path to the YAML file to be read.
 
     Returns:
-        dict: Parsed content of the YAML file as a dictionary.
+        dict: Parsed content of the YAML file as a dictionary with region and ami mapping information
+              subsituted
     """
     try:
-        config_file_data: Optional[Dict] = None
-        if os.path.isfile(file_path):
-            logger.info(f"{file_path} is a valid configuration file path.")
-            with open(file_path, "r") as file:
-                config_file_data = yaml.safe_load(file)
+        # Ensure the file exists
+        if not os.path.isfile(file_path):
+            logger.error(f"Invalid file path: {file_path}")
+            return None
+        logger.info(f"Reading configuration from: {file_path}")
+        # Read the YAML file as plain text
+        file_content = Path(file_path).read_text()
+        # Get the global region
+        global_region = get_region()
+        if global_region is None:
+            logger.error("Region could not be fetched.")
+            return None
+        logger.info(f"Global region detected: {global_region}")
+
+        # Load the YAML config temporarily to process mappings and instances
+        config_file_data = yaml.safe_load(file_content)
+        # Replace the region placeholder with the actual region
+        if "aws" in config_file_data:
+            config_file_data["aws"]["region"] = global_region
+
+        # Check if the AMI mapping file is defined and process instances
+        if AMI_MAPPING_PARAM_NAME in config_file_data:
+            ami_mapping_file = config_file_data[AMI_MAPPING_PARAM_NAME]
+            configs_dir = os.path.dirname(os.path.dirname(os.path.dirname(file_path)))
+            ami_mapping_full_path = os.path.join(configs_dir, ami_mapping_file)
+            logger.info(f"Loading AMI mapping from: {ami_mapping_full_path}")
+            ami_mapping = _load_ami_mapping(ami_mapping_full_path)
+
+            if "instances" in config_file_data:
+                for instance in config_file_data["instances"]:
+                    instance_type = instance["instance_type"]
+                    # Use region from the instance or fallback to global region
+                    instance_region = instance.get("region", global_region)
+                    # Determine the AMI type based on the instance type
+                    ami_type = AMI_TYPE.NEURON if IS_NEURON_INSTANCE(instance_type) else AMI_TYPE.GPU
+                    logger.info(f"Determining AMI type: {ami_type} for instance: {instance_type}")
+
+                    if instance_region in ami_mapping and ami_type in ami_mapping[instance_region]:
+                        ami_id = ami_mapping[instance_region][ami_type]
+                        # Update the ami_id in the instance configuration
+                        instance["ami_id"] = ami_id
+                        logger.info(f"Assigned AMI ID: {ami_id} to instance: {instance_type}")
+                    else:
+                        logger.error(
+                            f"No AMI ID found for {ami_type} in region: {instance_region}. "
+                            "Please update the AMI mapping file.")
+                        return
+        # Convert the updated config back to YAML
+        updated_yaml_content = yaml.dump(config_file_data, default_flow_style=False)
+        # Parse the final YAML content
+        final_config_data = yaml.safe_load(updated_yaml_content)
+        logger.info(f"Final configuration successfully loaded: {json.dumps(final_config_data, indent=2)}")
     except Exception as e:
-        logger.error(f"Error while loading the YAML file: {e}")
+        logger.error(f"Error while loading or processing the YAML file: {e}")
         config_file_data = None
     return config_file_data
 
