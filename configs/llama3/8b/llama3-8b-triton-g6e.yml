@@ -6,6 +6,8 @@ aws:
   # This is the path to the hf token file that contains your custom
   # hf token
   hf_token_fpath: /tmp/hf_token.txt
+  # AWS region, this parameter is templatized, no need to change
+  region: {region}
   
 # steps to run the fmbench orchestration
 # test. If all steps are set to yes, the security
@@ -38,6 +40,15 @@ key_pair_gen:
   # This assumes that if key_pair_generation is false, you have the key pair stored in the root.
   # If so, change the file name to your KP name and the script will pick it up.
   key_pair_name: fmbench_orchestrator_key_pair
+
+# all region specific AMI mapping information for gpu/neuron based instances
+# are given in this "ami_mapping.yml" file. This file currently contains information
+# on us-east-1, us-east-2, us-west-1, us-west-2 for gpu and neuron instances. To add
+# or change the ami mapping for other regions, modify this file. This model benchmarking
+# configuration file will utilize the region (determined by the region metadata) or if the
+# user provides it in the model config to get the AMI mapping and launch the specific
+# instance accordingly.
+ami_mapping: ami_mapping.yml 
 
 #Instance follows the format below.
 #   instance_id: {instance_id_here} if Instance_id, then you need to bring your own private key
@@ -78,8 +89,10 @@ key_pair_gen:
 instances:
 - instance_type: g6e.2xlarge
   deploy: yes
-  region: us-east-1
-  ami_id: ami-067bd563cecc90173
+  # The ami-id is fetched based on the region that this orchestrator is running in. If the region is provided
+  # in this instance dictionary, that is the region that will be used to determine the ami id, depending on 
+  # whether the instance_type above is a Neuron or GPU based instance
+  ami_id: {ami-id}
   device_name: /dev/sda1
   ebs_del_on_termination: True
   ebs_Iops: 16000
@@ -93,8 +106,10 @@ instances:
 
 - instance_type: g6e.4xlarge
   deploy: yes
-  region: us-east-1
-  ami_id: ami-067bd563cecc90173
+  # The ami-id is fetched based on the region that this orchestrator is running in. If the region is provided
+  # in this instance dictionary, that is the region that will be used to determine the ami id, depending on 
+  # whether the instance_type above is a Neuron or GPU based instance
+  ami_id: {ami-id}
   device_name: /dev/sda1
   ebs_del_on_termination: True
   ebs_Iops: 16000
@@ -108,8 +123,10 @@ instances:
 
 - instance_type: g6e.12xlarge
   deploy: yes
-  region: us-east-1
-  ami_id: ami-067bd563cecc90173
+  # The ami-id is fetched based on the region that this orchestrator is running in. If the region is provided
+  # in this instance dictionary, that is the region that will be used to determine the ami id, depending on 
+  # whether the instance_type above is a Neuron or GPU based instance
+  ami_id: {ami-id}
   device_name: /dev/sda1
   ebs_del_on_termination: True
   ebs_Iops: 16000
@@ -123,8 +140,10 @@ instances:
 
 - instance_type: g6e.24xlarge
   deploy: yes
-  region: us-east-1
-  ami_id: ami-067bd563cecc90173
+  # The ami-id is fetched based on the region that this orchestrator is running in. If the region is provided
+  # in this instance dictionary, that is the region that will be used to determine the ami id, depending on 
+  # whether the instance_type above is a Neuron or GPU based instance
+  ami_id: {ami-id}
   device_name: /dev/sda1
   ebs_del_on_termination: True
   ebs_Iops: 16000
@@ -139,8 +158,10 @@ instances:
 
 - instance_type: g6e.48xlarge
   deploy: yes
-  region: us-east-1
-  ami_id: ami-067bd563cecc90173
+  # The ami-id is fetched based on the region that this orchestrator is running in. If the region is provided
+  # in this instance dictionary, that is the region that will be used to determine the ami id, depending on 
+  # whether the instance_type above is a Neuron or GPU based instance
+  ami_id: {ami-id}
   device_name: /dev/sda1
   ebs_del_on_termination: True
   ebs_Iops: 16000
