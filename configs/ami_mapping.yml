@@ -1,0 +1,23 @@
+# This AMI-mapping configuration file contains AMI mapping information per gpu/neuron based instance
+# for specific regions. These AMIs are mapped at the time of start up of instances that are used to 
+# benchmark the models. The region is fetched from the configuration file.
+
+# AMI-mapping for us-east-1
+us-east-1:
+  neuron: ami-05d498302130f9036
+  gpu: ami-067bd563cecc90173
+
+# AMI-mapping for us-east-2
+us-east-2:
+  neuron: ami-0109f5338f9bfc64e
+  gpu: ami-09748f93764b742d1
+
+# AMI-mapping for us-west-1
+us-west-1:
+  neuron: ami-092330f6c49fb8a0b
+  gpu: ami-047dca3c2da215909
+
+# AMI-mapping for us-west-2
+us-west-2:
+  neuron: ami-084d4a2de05b27a18
+  gpu: ami-0ed0fd5212e1c579b
