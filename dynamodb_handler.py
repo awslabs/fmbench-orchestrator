@@ -3,7 +3,7 @@ import boto3
 import logging
 from constants import *
 from datetime import datetime
-from globals import get_region
+from globals import get_region, get_account_identity
 from botocore.exceptions import ClientError, NoCredentialsError, PartialCredentialsError
 
 logger = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ class DynamoDBHandler:
         table (Table): The DynamoDB table instance.
     """
 
-    def __init__(self, table_name: str):
+    def __init__(self, run_uid: str, table_name: str = DEFAULT_DYNAMODB_TABLE_NAME):
         """
         Initializes the DynamoDBHandler with the table name and AWS region.
 
@@ -32,6 +32,8 @@ class DynamoDBHandler:
         self.region = get_region()
         self.dynamodb = boto3.resource("dynamodb", region_name=self.region)
         self.table = self.get_or_create_table()
+        self.instance_uid = str(uuid.uuid4())
+        self.run_uid = run_uid
 
     def get_or_create_table(self):
         """
@@ -71,14 +73,22 @@ class DynamoDBHandler:
                 raise e
         return table
 
-    def insert_item(self, item_data: dict):
+    def insert_item(
+        self,
+        item_data: dict,
+        execution_status: str,
+        keys_to_include: list = DYNAMODB_KEY_LIST,
+    ):
         """
-        Inserts an item into the DynamoDB table. Automatically generates a unique 'UID'
-        for the item and adds 'timestamp' and 'date' fields if they are not present.
+        Inserts a subset of item_data into the DynamoDB table, along with an additional 'status' parameter.
+        Automatically generates a unique 'UID' for the item and adds 'timestamp' and 'date' fields if they
+        are not present. It also includes the AWS account ID.
 
         Args:
             item_data (dict): A dictionary containing the attributes for the item to insert,
-                              excluding 'UID' as it will be generated automatically.
+                            excluding 'UID' as it will be generated automatically.
+            keys_to_include (list): A list of keys to include from item_data in the DynamoDB item.
+            status (str): The execution status to include in the item data.
 
         Raises:
             ClientError: If there is an issue inserting the item into the DynamoDB table.
@@ -87,17 +97,30 @@ class DynamoDBHandler:
             logger.warning("Table not initialized. Item insertion skipped.")
             return
 
-        # Generate a unique UID
-        uid = str(uuid.uuid4())
-        item_data["UID"] = uid
+        # Filter item_data to include only specified keys
+        filtered_data = {
+            key: item_data[key] for key in keys_to_include if key in item_data
+        }
 
-        # Add 'timestamp' and 'date' fields
-        item_data.setdefault("timestamp", datetime.now().isoformat())
-        item_data.setdefault("date", datetime.now().strftime("%Y-%m-%d"))
+        # Add the additional 'status' field
+        filtered_data["execution_status"] = execution_status
+        filtered_data["run_uid"] = self.run_uid
+        filtered_data["instance_uid"] = self.instance_uid
+
+        # Add 'timestamp' and 'date' fields if not provided
+        filtered_data.setdefault("timestamp", datetime.now().isoformat())
+        filtered_data.setdefault("date", datetime.now().strftime("%Y-%m-%d"))
+
+        # Retrieve AWS account ID and add it to filtered_data
+        account_id = get_account_identity()
+        if account_id:
+            filtered_data["account_id"] = account_id
+        else:
+            logger.warning("Account ID could not be retrieved. Proceeding without it.")
 
         try:
-            self.table.put_item(Item=item_data)
-            logger.info(f"Inserted item with UID {uid}: {item_data}")
+            self.table.put_item(Item=filtered_data)
+            logger.info(f"Inserted item with UID {uid}: {filtered_data}")
         except ClientError as e:
             logger.error(f"Failed to insert item: {e}")
             raise e
