@@ -102,7 +102,6 @@ class DynamoDBHandler:
             key: item_data[key] for key in keys_to_include if key in item_data
         }
 
-        # Add the additional 'status' field
         filtered_data["execution_status"] = execution_status
         filtered_data["run_uid"] = self.run_uid
         filtered_data["instance_uid"] = self.instance_uid
@@ -120,7 +119,9 @@ class DynamoDBHandler:
 
         try:
             self.table.put_item(Item=filtered_data)
-            logger.info(f"Inserted item with UID {uid}: {filtered_data}")
+            logger.info(
+                f"Inserted item with Instance UID {self.instance_uid}: {filtered_data}"
+            )
         except ClientError as e:
             logger.error(f"Failed to insert item: {e}")
             raise e

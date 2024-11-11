@@ -55,6 +55,7 @@ async def execute_fmbench(instance, post_install_script, remote_script_path):
     Asynchronous wrapper for deploying an instance using synchronous functions.
     """
     # Check for the startup completion flag
+    dynamodb_client.insert_item(instance, "Instance Creation")
     startup_complete = await asyncio.get_event_loop().run_in_executor(
         executor,
         wait_for_flag,
@@ -62,6 +63,7 @@ async def execute_fmbench(instance, post_install_script, remote_script_path):
         STARTUP_COMPLETE_FLAG_FPATH,
         CLOUD_INITLOG_PATH,
     )
+    dynamodb_client.insert_item(instance, "Startup script completion")
 
     if startup_complete:
         if instance["upload_files"]:
@@ -112,6 +114,7 @@ async def execute_fmbench(instance, post_install_script, remote_script_path):
             retry_sleep = 60
             while True:
                 logger.info("Startup Script complete, executing fmbench now")
+                dynamodb_client.insert_item(instance, "Executing Fmbench")
                 script_output = await asyncio.get_event_loop().run_in_executor(
                     executor,
                     upload_and_execute_script_invoke_shell,
@@ -151,6 +154,7 @@ async def execute_fmbench(instance, post_install_script, remote_script_path):
                 instance["fmbench_complete_timeout"],
                 SCRIPT_CHECK_INTERVAL_IN_SECONDS,
             )
+            dynamodb_client.insert_item(instance, "Fmbench Complete")
 
             logger.info("Going to get fmbench.log from the instance now")
             results_folder = os.path.join(
@@ -176,6 +180,7 @@ async def execute_fmbench(instance, post_install_script, remote_script_path):
                 )
         if globals.config_data["run_steps"]["delete_ec2_instance"]:
             delete_ec2_instance(instance["instance_id"], instance["region"])
+            dynamodb_client.insert_item(instance, "Cleanup")
             instance_id_list.remove(instance["instance_id"])
 
 
@@ -302,6 +307,7 @@ if __name__ == "__main__":
             logger.info(
                 f"going to create instance {idx} of {num_instances}, instance={instance}"
             )
+            instance_uid = str(uuid.uuid4())
             deploy: bool = instance.get("deploy", True)
             if deploy is False:
                 logger.warning(
@@ -380,6 +386,7 @@ if __name__ == "__main__":
                 )
                 instance_id_list.append(instance_id)
                 instance_data_map[instance_id] = {
+                    "instance_uid": instance_uid,
                     "fmbench_config": instance["fmbench_config"],
                     "post_startup_script": instance["post_startup_script"],
                     "post_startup_script_params": instance.get(
@@ -415,6 +422,7 @@ if __name__ == "__main__":
                 if PRIVATE_KEY_FNAME:
                     instance_id_list.append(instance_id)
                     instance_data_map[instance_id] = {
+                        "instance_uid": instance_uid,
                         "fmbench_config": instance["fmbench_config"],
                         "post_startup_script": instance["post_startup_script"],
                         "fmbench_complete_timeout": instance[
@@ -429,7 +437,6 @@ if __name__ == "__main__":
                     }
 
                 logger.info(f"done creating instance {idx} of {num_instances}")
-                dynamodb_client.insert_item(instance, "Instance_Creation")
 
     sleep_time = 60
     logger.info(
@@ -441,5 +448,6 @@ if __name__ == "__main__":
         instance_details = generate_instance_details(
             instance_id_list, instance_data_map
         )  # Call the async function
+        
         asyncio.run(main())
     logger.info("all done")
