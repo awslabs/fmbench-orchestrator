@@ -8,6 +8,7 @@ aws:
   hf_token_fpath: /tmp/hf_token.txt
   # AWS region, this parameter is templatized, no need to change
   region: {{region}}
+  metric_collection: yes
   
 # steps to run the fmbench orchestration
 # test. If all steps are set to yes, the security

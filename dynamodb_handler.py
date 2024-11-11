@@ -1,7 +1,9 @@
+import uuid
 import boto3
 import logging
-import uuid
+from constants import *
 from datetime import datetime
+from globals import get_region
 from botocore.exceptions import ClientError, NoCredentialsError, PartialCredentialsError
 
 logger = logging.getLogger(__name__)
@@ -18,7 +20,7 @@ class DynamoDBHandler:
         table (Table): The DynamoDB table instance.
     """
 
-    def __init__(self, table_name: str, region: str):
+    def __init__(self, table_name: str):
         """
         Initializes the DynamoDBHandler with the table name and AWS region.
 
@@ -27,8 +29,8 @@ class DynamoDBHandler:
             region (str): The AWS region for the DynamoDB table.
         """
         self.table_name = table_name
-        self.region = region
-        self.dynamodb = boto3.resource("dynamodb", region_name=region)
+        self.region = get_region()
+        self.dynamodb = boto3.resource("dynamodb", region_name=self.region)
         self.table = self.get_or_create_table()
 
     def get_or_create_table(self):

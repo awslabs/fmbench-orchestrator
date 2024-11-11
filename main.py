@@ -20,6 +20,7 @@ from typing import Optional, List
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from botocore.exceptions import NoCredentialsError, ClientError
+from dynamodb_handler import DynamoDBHandler
 from globals import (
     create_iam_instance_profile_arn,
     get_region,
@@ -278,7 +279,6 @@ if __name__ == "__main__":
             )
 
         logger.info(f"iam arn: {iam_arn}")
-        # WIP Parallelize This.
         num_instances: int = len(globals.config_data["instances"])
         for idx, instance in enumerate(globals.config_data["instances"]):
             idx += 1
