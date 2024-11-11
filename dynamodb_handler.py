@@ -38,7 +38,8 @@ class DynamoDBHandler:
     def get_or_create_table(self):
         """
         Attempts to retrieve the specified DynamoDB table. If the table does not exist,
-        it creates a new table with on-demand billing and a primary key of 'UID'.
+        it creates a new table with on-demand billing and a composite primary key of 
+        'run_uid' (partition key) and 'instance_uid' (sort key).
 
         Returns:
             Table: The DynamoDB table instance if successful, or None if IAM permissions are missing.
@@ -60,9 +61,13 @@ class DynamoDBHandler:
                 )
                 table = self.dynamodb.create_table(
                     TableName=self.table_name,
-                    KeySchema=[{"AttributeName": "UID", "KeyType": "HASH"}],
+                    KeySchema=[
+                        {"AttributeName": "run_uid", "KeyType": "HASH"},
+                        {"AttributeName": "timestamp", "KeyType": "RANGE"}
+                    ],
                     AttributeDefinitions=[
-                        {"AttributeName": "UID", "AttributeType": "S"}
+                        {"AttributeName": "run_uid", "AttributeType": "S"},
+                        {"AttributeName": "timestamp", "AttributeType": "S"}
                     ],
                     BillingMode="PAY_PER_REQUEST",
                 )

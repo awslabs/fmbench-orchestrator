@@ -257,8 +257,8 @@ if __name__ == "__main__":
     metric_collection = globals.config_data["aws"].get("metric_collection")
 
     if metric_collection:
-        logger.info(f"Metric Collection is set to yes, Initializing DynamoDB client, 
-                    setting the table name as: {DEFAULT_DYNAMODB_TABLE_NAME}")
+        logger.info(f"Metric Collection is set to yes, Initializing DynamoDB client," 
+                    f"setting the table name as: {DEFAULT_DYNAMODB_TABLE_NAME}")
         logger.info(f"Unique ID for this run is {run_uid}")
         dynamodb_client = DynamoDBHandler(run_uid)
     else:

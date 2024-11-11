@@ -16,3 +16,4 @@ configs/fmbench/*
 results/
 analytics/__pycache__
 analytics/results
+prototype/
