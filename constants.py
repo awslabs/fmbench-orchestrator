@@ -33,7 +33,7 @@ MAX_INSTANCE_COUNT: int = 1
 
 # Default constants for DynamoDB creation
 DEFAULT_DYNAMODB_TABLE_NAME = "fmbench-orchestrator"
-DYNAMODB_KEY_LIST = ["instance_name", "region", "config_file"]
+DYNAMODB_KEY_LIST = ["instance_name", "region", "config_file", "instance_uid"]
 
 # all region specific AMI mapping information for gpu/neuron based instances
 # are given in this "ami_mapping.yml" file. This file currently contains information

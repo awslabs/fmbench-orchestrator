@@ -352,7 +352,6 @@ def get_account_identity():
         sts_client = boto3.client("sts")
         identity = sts_client.get_caller_identity()
         account_id = identity.get("Account")
-        logger.info(f"Retrieved AWS account ID: {account_id}")
         return account_id
     except Exception as e:
         logger.error(f"Failed to retrieve account identity: {e}")

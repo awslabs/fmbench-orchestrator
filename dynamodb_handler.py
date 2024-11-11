@@ -32,7 +32,6 @@ class DynamoDBHandler:
         self.region = get_region()
         self.dynamodb = boto3.resource("dynamodb", region_name=self.region)
         self.table = self.get_or_create_table()
-        self.instance_uid = str(uuid.uuid4())
         self.run_uid = run_uid
 
     def get_or_create_table(self):
@@ -109,8 +108,7 @@ class DynamoDBHandler:
 
         filtered_data["execution_status"] = execution_status
         filtered_data["run_uid"] = self.run_uid
-        filtered_data["instance_uid"] = self.instance_uid
-
+        instance_uid = filtered_data["instance_uid"]
         # Add 'timestamp' and 'date' fields if not provided
         filtered_data.setdefault("timestamp", datetime.now().isoformat())
         filtered_data.setdefault("date", datetime.now().strftime("%Y-%m-%d"))
@@ -125,7 +123,7 @@ class DynamoDBHandler:
         try:
             self.table.put_item(Item=filtered_data)
             logger.info(
-                f"Inserted item with Instance UID {self.instance_uid}: {filtered_data}"
+                f"Inserted item with Instance UID {instance_uid}: {filtered_data}"
             )
         except ClientError as e:
             logger.error(f"Failed to insert item: {e}")
