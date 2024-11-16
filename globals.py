@@ -8,12 +8,18 @@ from constants import *
 from typing import Tuple
 from utils import authorize_inbound_rules, create_key_pair
 from botocore.exceptions import NoCredentialsError, ClientError
-from utils import create_security_group, load_yaml_file, _get_ec2_hostname_and_username, get_region
+from utils import (
+    create_security_group,
+    load_yaml_file,
+    _get_ec2_hostname_and_username,
+    get_region,
+)
 
 # set a logger
 logger = logging.getLogger(__name__)
 
 config_data = {}
+
 
 def get_iam_role() -> str:
     try:
@@ -288,7 +294,9 @@ def get_key_pair(region):
 
     # Generate the key pair name using the format: config_name-region
     key_pair_name = f"{key_pair_name_configured}_{region}"
-    logger.info(f"key_pair_name_configured={key_pair_name_configured}, setting the key pair name as={key_pair_name}")
+    logger.info(
+        f"key_pair_name_configured={key_pair_name_configured}, setting the key pair name as={key_pair_name}"
+    )
     private_key_fname = os.path.join(key_pair_dir, f"{key_pair_name}.pem")
 
     # Check if key pair generation is enabled
@@ -331,3 +339,20 @@ def get_key_pair(region):
         except IOError as e:
             raise ValueError(f"Error reading key pair file '{private_key_fname}': {e}")
     return private_key_fname, key_pair_name
+
+
+def get_account_identity():
+    """
+    Retrieves the AWS account ID for the current credentials.
+
+    Returns:
+        str: The AWS account ID if retrieval is successful, or None if there is an error.
+    """
+    try:
+        sts_client = boto3.client("sts")
+        identity = sts_client.get_caller_identity()
+        account_id = identity.get("Account")
+        return account_id
+    except Exception as e:
+        logger.error(f"Failed to retrieve account identity: {e}")
+        return None

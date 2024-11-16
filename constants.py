@@ -31,6 +31,10 @@ CAPACITY_RESERVATION_PREFERENCE: str = "none"
 MIN_INSTANCE_COUNT: int = 1
 MAX_INSTANCE_COUNT: int = 1
 
+# Default constants for DynamoDB creation
+DEFAULT_DYNAMODB_TABLE_NAME = "fmbench-orchestrator"
+DYNAMODB_KEY_LIST = ["instance_name", "region", "config_file", "instance_uid"]
+
 # all region specific AMI mapping information for gpu/neuron based instances
 # are given in this "ami_mapping.yml" file. This file currently contains information
 # on us-east-1, us-east-2, us-west-1, us-west-2 for gpu and neuron instances. To add

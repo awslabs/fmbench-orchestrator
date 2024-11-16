@@ -27,10 +27,11 @@ logger = logging.getLogger(__name__)
 
 executor = ThreadPoolExecutor()
 
+
 def _get_latest_version(package_name: str) -> Optional[str]:
     url = f"https://pypi.org/pypi/{package_name}/json"
     response = requests.get(url)
-    
+
     if response.status_code == 200:
         data = response.json()
         version = data["info"]["version"]
@@ -39,9 +40,10 @@ def _get_latest_version(package_name: str) -> Optional[str]:
         version = None
     return version
 
+
 def get_region() -> str:
     """
-    This function fetches the current region where this orchestrator is running using the 
+    This function fetches the current region where this orchestrator is running using the
     EC2 region metadata API or the boto3 session if the region cannot be determined from
     the API.
     """
@@ -74,30 +76,33 @@ def get_region() -> str:
         region_name = None
     return region_name
 
+
 def _normalize_yaml_param_spacing(template_content: str, variable_name: str) -> str:
     """
     Replaces all possible spacing combinations of '{{ gpu_ami}}' with '{{gpu_ami}}'.
-    
+
     Parameters:
     - template_content (str): The content of the template with potential spacing around 'gpu_ami'.
     - param_name (str): The name of the parameter to fix spacing
     Returns:
     - str: The template content with normalized '{{gpu_ami}}' placeholders.
     """
-    
+
     # Define the regex pattern to match '{{ gpu_ami}}' with any possible spacing
     pattern = r"\{\{\s*" + re.escape(variable_name) + r"\s*\}\}"
-    
+
     # Replace all occurrences of the pattern with '{{gpu_ami}}'
     normalized_content = re.sub(pattern, f"{{{variable_name}}}", template_content)
-    
+
     return normalized_content
 
 
-def load_yaml_file(config_file_path: str,
-                   ami_mapping_file_path: str,
-                   fmbench_config_file: Optional[str],
-                   write_bucket: Optional[str]) -> Optional[Dict]:
+def load_yaml_file(
+    config_file_path: str,
+    ami_mapping_file_path: str,
+    fmbench_config_file: Optional[str],
+    write_bucket: Optional[str],
+) -> Optional[Dict]:
     """
     Load and parse a YAML file using Jinja2 templating for region and AMI ID substitution.
 
@@ -108,32 +113,36 @@ def load_yaml_file(config_file_path: str,
         Optional[Dict]: Parsed content of the YAML file as a dictionary with region and AMI mapping information
                         substituted, or None if an error occurs.
     """
-   
+
     if Path(config_file_path).is_file() is False:
         logger.error(f"{config_file_path} not found, cannot continue")
         raise FileNotFoundError(f"file '{config_file_path}' does not exist.")
-    
+
     if Path(ami_mapping_file_path).is_file() is False:
         logger.error(f"{ami_mapping_file_path} not found, cannot continue")
         raise FileNotFoundError(f"file '{ami_mapping_file_path}' does not exist.")
-    
+
     template_content = Path(config_file_path).read_text()
     # Normalize the spacing, so {{ gpu }} and {{ gpu}} etc all get converted
     # to {{gpu}}
-    for param in ['gpu', 'cpu', 'neuron']:
+    for param in ["gpu", "cpu", "neuron"]:
         template_content = _normalize_yaml_param_spacing(template_content, param)
 
     # Get the global region where this orchestrator is running
     # Initial context with 'region'
     global_region = get_region()
-    context = {'region': global_region, 'config_file': fmbench_config_file, 'write_bucket': write_bucket}
+    context = {
+        "region": global_region,
+        "config_file": fmbench_config_file,
+        "write_bucket": write_bucket,
+    }
     # First rendering to substitute 'region' and 'config_file'
     # if the {{config_file}} placeholder does not exist in the config.yml
     # then the 'config_file' key in the 'context' dict does not do anything
     # if the {{config_file}} placeholder does indeed exist then it will get
     # replaced with the value in the context dict, if however the user did not
     # provide the value as a command line argument to the orchestrator then it
-    # would get replaced by None and we would have no fmbench config file and the 
+    # would get replaced by None and we would have no fmbench config file and the
     # code would raise an exception that it cannot continue
     template = Template(template_content)
     rendered_yaml = template.render(context)
@@ -142,20 +151,20 @@ def load_yaml_file(config_file_path: str,
     config_data = yaml.safe_load(rendered_yaml)
 
     # Fetch the AMI mapping file
-    ami_mapping =  yaml.safe_load(Path(ami_mapping_file_path).read_text())
+    ami_mapping = yaml.safe_load(Path(ami_mapping_file_path).read_text())
 
     # at this time any instance of ami_id: ami-something would remain as is
     # but any instance ami_id: gpu have been converted to ami_id: {gpu: None}
     # so we will iterate through the instance to replace ami_id with region specific
     # ami_id values from the ami_mapping we have. We have to do this because jinja2 does not
     # support nested variables and all other options added unnecessary complexity
-    for i, instance in enumerate(config_data['instances']):
-        if instance.get('region') is None:
-            config_data['instances'][i]['region'] = global_region
+    for i, instance in enumerate(config_data["instances"]):
+        if instance.get("region") is None:
+            config_data["instances"][i]["region"] = global_region
             region = global_region
         else:
-            region = instance['region']
-        ami_id = instance['ami_id']
+            region = instance["region"]
+        ami_id = instance["ami_id"]
 
         if isinstance(ami_id, dict):
             # name of the first key, could be gpu, cpu, neuron or others in future
@@ -164,31 +173,49 @@ def load_yaml_file(config_file_path: str,
             if ami_mapping.get(region):
                 ami_id_from_config = ami_mapping[region].get(ami_key)
                 if ami_id_from_config is None:
-                    logger.error(f"instance {i+1}, instance_type={instance['instance_type']}, no ami found for {region} type {ami_key}")
-                    raise Exception(f"instance {i+1}, instance_type={instance['instance_type']}, no ami found for {region} type {ami_key}")
+                    logger.error(
+                        f"instance {i+1}, instance_type={instance['instance_type']}, no ami found for {region} type {ami_key}"
+                    )
+                    raise Exception(
+                        f"instance {i+1}, instance_type={instance['instance_type']}, no ami found for {region} type {ami_key}"
+                    )
             else:
-                logger.error(f"no info found for region {region} in {ami_mapping_file_path}, cannot continue")
-                raise Exception(f"instance {i+1}, instance_type={instance['instance_type']}, no info found in region {region} in {ami_mapping_file_path}, cannot continue")
-            logger.info(f"instance {i+1}, instance_type={instance['instance_type']}, ami_key={ami_key}, region={region}, ami_id_from_config={ami_id_from_config}")
+                logger.error(
+                    f"no info found for region {region} in {ami_mapping_file_path}, cannot continue"
+                )
+                raise Exception(
+                    f"instance {i+1}, instance_type={instance['instance_type']}, no info found in region {region} in {ami_mapping_file_path}, cannot continue"
+                )
+            logger.info(
+                f"instance {i+1}, instance_type={instance['instance_type']}, ami_key={ami_key}, region={region}, ami_id_from_config={ami_id_from_config}"
+            )
             # set the ami id
-            config_data['instances'][i]['ami_id'] = ami_id_from_config
+            config_data["instances"][i]["ami_id"] = ami_id_from_config
         elif isinstance(ami_id, str):
-            logger.info(f"instance {i+1}, instance_type={instance['instance_type']}, region={region}, ami_id={ami_id}")
+            logger.info(
+                f"instance {i+1}, instance_type={instance['instance_type']}, region={region}, ami_id={ami_id}"
+            )
         else:
-            raise Exception(f"instance {i+1}, instance_type={instance['instance_type']}, "
-                            f"no info found for ami_id {ami_id}, region {region} in {ami_mapping_file_path}, cannot continue")
+            raise Exception(
+                f"instance {i+1}, instance_type={instance['instance_type']}, "
+                f"no info found for ami_id {ami_id}, region {region} in {ami_mapping_file_path}, cannot continue"
+            )
 
         # see if we need to unfurl the fmbench config file url
-        fmbench_config_paths = instance['fmbench_config']
+        fmbench_config_paths = instance["fmbench_config"]
         if isinstance(fmbench_config_paths, list):
             for j in range(len(fmbench_config_paths)):
-                if fmbench_config_paths[j] is None or fmbench_config_paths[j] == 'None':
-                    raise Exception(f"instance {i+1}, instance_type={instance['instance_type']}, "
-                                    f"no fmbench_config file provided, cannot continue")
+                if fmbench_config_paths[j] is None or fmbench_config_paths[j] == "None":
+                    raise Exception(
+                        f"instance {i+1}, instance_type={instance['instance_type']}, "
+                        f"no fmbench_config file provided, cannot continue"
+                    )
 
                 if fmbench_config_paths[j].startswith(FMBENCH_CFG_PREFIX):
-                    fmbench_config_paths[j] = fmbench_config_paths[j].replace(FMBENCH_CFG_PREFIX, FMBENCH_CFG_GH_PREFIX)
-            config_data['instances'][i]['fmbench_config'] = fmbench_config_paths
+                    fmbench_config_paths[j] = fmbench_config_paths[j].replace(
+                        FMBENCH_CFG_PREFIX, FMBENCH_CFG_GH_PREFIX
+                    )
+            config_data["instances"][i]["fmbench_config"] = fmbench_config_paths
 
     return config_data
 
@@ -385,15 +412,21 @@ def create_ec2_instance(
     instance_id: Optional[str] = None
     try:
         instance_name: str = f"FMBench-{instance_type}-{idx}"
-        
+
         # Prepare the CapacityReservationSpecification
         capacity_reservation_spec = {}
         if CapacityReservationId:
-            capacity_reservation_spec["CapacityReservationTarget"] = {"CapacityReservationId": CapacityReservationId}
+            capacity_reservation_spec["CapacityReservationTarget"] = {
+                "CapacityReservationId": CapacityReservationId
+            }
         elif CapacityReservationResourceGroupArn:
-            capacity_reservation_spec["CapacityReservationTarget"] = {"CapacityReservationResourceGroupArn": CapacityReservationResourceGroupArn}
+            capacity_reservation_spec["CapacityReservationTarget"] = {
+                "CapacityReservationResourceGroupArn": CapacityReservationResourceGroupArn
+            }
         elif CapacityReservationPreference:
-            capacity_reservation_spec["CapacityReservationPreference"] = CapacityReservationPreference
+            capacity_reservation_spec["CapacityReservationPreference"] = (
+                CapacityReservationPreference
+            )
 
         # Create a new EC2 instance with user data
         instances = ec2_resource.create_instances(
@@ -422,20 +455,27 @@ def create_ec2_instance(
             TagSpecifications=[
                 {
                     "ResourceType": "instance",
-                    "Tags": [{"Key": "Name", "Value": instance_name},
-                             {"Key": "fmbench-version", "Value": _get_latest_version(FMBENCH_PACKAGE_NAME)}],
+                    "Tags": [
+                        {"Key": "Name", "Value": instance_name},
+                        {
+                            "Key": "fmbench-version",
+                            "Value": _get_latest_version(FMBENCH_PACKAGE_NAME),
+                        },
+                    ],
                 }
             ],
         )
 
         if instances:
             instance_id = instances[0].id
-            logger.info(f"EC2 Instance '{instance_id}', '{instance_name}' created successfully with user data.")
+            logger.info(
+                f"EC2 Instance '{instance_id}', '{instance_name}' created successfully with user data."
+            )
         else:
             logger.error("Instances could not be created")
     except Exception as e:
         logger.error(f"Error creating EC2 instance: {e}")
-        instance_id=None
+        instance_id = None
     return instance_id
 
 
@@ -536,7 +576,9 @@ def _get_ec2_hostname_and_username(
             logger.info(f"tags={tags}")
             instance_names = [t["Value"] for t in tags if t["Key"] == "Name"]
             if not instance_names:
-                instance_name = "FMBench-" + instance.get('InstanceType') + "-" + instance_id
+                instance_name = (
+                    "FMBench-" + instance.get("InstanceType") + "-" + instance_id
+                )
             else:
                 instance_name = instance_names[0]
         # Determine the username based on the AMI ID
@@ -700,7 +742,10 @@ def check_and_retrieve_results_folder(instance: Dict, local_folder_base: str):
             f"Error occured while attempting to check and retrieve results from the instances: {e}"
         )
 
-def get_fmbench_log(instance: Dict, local_folder_base: str, log_file_path: str, iter_count: int):
+
+def get_fmbench_log(
+    instance: Dict, local_folder_base: str, log_file_path: str, iter_count: int
+):
     """
     Checks for 'fmbench.log' file on a single EC2 instance and retrieves them if found.
 
@@ -719,7 +764,7 @@ def get_fmbench_log(instance: Dict, local_folder_base: str, log_file_path: str, 
     log_file_path = log_file_path.format(username=username)
     # Define local folder to store the log file
     local_folder = os.path.join(local_folder_base, instance_name)
-    local_log_file = os.path.join(local_folder, f'fmbench_{iter_count}.log')
+    local_log_file = os.path.join(local_folder, f"fmbench_{iter_count}.log")
 
     try:
         # Clear out the local folder if it exists, then recreate it
@@ -744,7 +789,9 @@ def get_fmbench_log(instance: Dict, local_folder_base: str, log_file_path: str, 
         ssh_client.close()
 
     except Exception as e:
-        logger.error(f"Error occurred while retrieving the log file from {instance_name}: {e}")
+        logger.error(
+            f"Error occurred while retrieving the log file from {instance_name}: {e}"
+        )
 
 
 def generate_instance_details(instance_id_list, instance_data_map):
@@ -792,13 +839,13 @@ def generate_instance_details(instance_id_list, instance_data_map):
 
         # Extract all the necessary configuration values from the config entry
         fmbench_config = config_entry["fmbench_config"]
+        instance_uid = config_entry["instance_uid"]
         post_startup_script = config_entry["post_startup_script"]
         upload_files = config_entry.get("upload_files")
         post_startup_script_params = config_entry.get("post_startup_script_params")
         fmbench_complete_timeout = config_entry["fmbench_complete_timeout"]
         region = config_entry["region"]
         PRIVATE_KEY_FNAME = config_entry["PRIVATE_KEY_FNAME"]
-
 
         # Get the public hostname and username for each instance
         public_hostname, username, instance_name = _get_ec2_hostname_and_username(
@@ -819,8 +866,9 @@ def generate_instance_details(instance_id_list, instance_data_map):
                         else PRIVATE_KEY_FNAME
                     ),
                     "config_file": fmbench_config,
+                    "instance_uid": instance_uid,
                     "post_startup_script": post_startup_script,
-                    "post_startup_script_params" : post_startup_script_params,
+                    "post_startup_script_params": post_startup_script_params,
                     "upload_files": upload_files,
                     "fmbench_complete_timeout": fmbench_complete_timeout,
                     "region": config_entry.get("region", "us-east-1"),
@@ -914,14 +962,17 @@ def upload_and_execute_script_invoke_shell(
             except Exception as e:
                 logger.error(f"Failed to upload script to {remote_script_path}: {e}")
 
-
             with ssh_client.invoke_shell() as shell:
                 time.sleep(1)  # Give the shell some time to initialize
 
-                logger.info("Going to check if FMBench complete Flag exists in this instance, if it does, remove it")
+                logger.info(
+                    "Going to check if FMBench complete Flag exists in this instance, if it does, remove it"
+                )
                 # Check if fmbench flag exists, if it does, remove it:
-                shell.send("if [ -f /tmp/fmbench_completed.flag ]; then rm /tmp/fmbench_completed.flag; fi\n")
-                
+                shell.send(
+                    "if [ -f /tmp/fmbench_completed.flag ]; then rm /tmp/fmbench_completed.flag; fi\n"
+                )
+
                 time.sleep(1)
 
                 shell.send(f"chmod +x {remote_script_path}\n")
@@ -961,11 +1012,9 @@ async def download_config_async(url, download_dir=DOWNLOAD_DIR_FOR_CFG_FILES):
     return local_path
 
 
-async def upload_file_to_instance_async(
-    hostname, username, key_file_path, file_paths
-):
+async def upload_file_to_instance_async(hostname, username, key_file_path, file_paths):
     """Asynchronously uploads multiple files to the EC2 instance."""
-    
+
     def upload_files():
         # Initialize the SSH client
         ssh_client = paramiko.SSHClient()
@@ -981,8 +1030,8 @@ async def upload_file_to_instance_async(
         # Upload the files
         with SCPClient(ssh_client.get_transport()) as scp:
             for file_path in file_paths:
-                local_path = file_path['local']
-                remote_path = file_path['remote']
+                local_path = file_path["local"]
+                remote_path = file_path["remote"]
                 scp.put(local_path, remote_path)
                 logger.info(f"Uploaded {local_path} to {hostname}:{remote_path}")
 
@@ -992,13 +1041,14 @@ async def upload_file_to_instance_async(
     # Run the blocking operation in a separate thread
     await asyncio.to_thread(upload_files)
 
+
 # Asynchronous function to handle the configuration file
 async def handle_config_file_async(instance, config_file):
     """Handles downloading and uploading of the config file based on the config type (URL or local path)."""
-    
+
     config_path = config_file
     file_paths = []
-    
+
     # Check if the config path is a URL
     if urllib.parse.urlparse(config_path).scheme in ("http", "https"):
         logger.info(f"Config is a URL. Downloading from {config_path}...")
@@ -1008,18 +1058,20 @@ async def handle_config_file_async(instance, config_file):
         local_config_path = config_path
 
     # Define the remote path for the configuration file on the EC2 instance
-    remote_config_path = f"/home/{instance['username']}/{os.path.basename(local_config_path)}"
+    remote_config_path = (
+        f"/home/{instance['username']}/{os.path.basename(local_config_path)}"
+    )
     logger.info(f"remote_config_path is: {remote_config_path}...")
 
     # Append the local and remote paths to the list of files to upload
-    file_paths.append({'local': local_config_path, 'remote': remote_config_path})
+    file_paths.append({"local": local_config_path, "remote": remote_config_path})
 
     # Upload the configuration file to the EC2 instance
     await upload_file_to_instance_async(
         instance["hostname"],
         instance["username"],
         instance["key_file_path"],
-        file_paths  # Now passing the list of dictionaries with local and remote paths
+        file_paths,  # Now passing the list of dictionaries with local and remote paths
     )
 
     return remote_config_path

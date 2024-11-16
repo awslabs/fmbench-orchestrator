@@ -19,7 +19,8 @@ Name it something like ```fmbench-orchestrator-permissions```
                     "ecr:BatchCheckLayerAvailability",
                     "ecr:GetDownloadUrlForLayer",
                     "ecr:BatchGetImage",
-                    "ecr:ListImages"
+                    "ecr:ListImages",
+                    "sts:GetCallerIdentity"
                 ],
                 "Resource": "*"
             },

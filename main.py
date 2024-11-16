@@ -3,6 +3,7 @@ import sys
 import time
 import json
 import wget
+import uuid
 import yaml
 import boto3
 import base64
@@ -20,6 +21,7 @@ from typing import Optional, List
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from botocore.exceptions import NoCredentialsError, ClientError
+from dynamodb_handler import DynamoDBHandler
 from globals import (
     create_iam_instance_profile_arn,
     get_region,
@@ -53,6 +55,7 @@ async def execute_fmbench(instance, post_install_script, remote_script_path):
     Asynchronous wrapper for deploying an instance using synchronous functions.
     """
     # Check for the startup completion flag
+    dynamodb_client.insert_item(instance, "Instance Creation")
     startup_complete = await asyncio.get_event_loop().run_in_executor(
         executor,
         wait_for_flag,
@@ -60,6 +63,7 @@ async def execute_fmbench(instance, post_install_script, remote_script_path):
         STARTUP_COMPLETE_FLAG_FPATH,
         CLOUD_INITLOG_PATH,
     )
+    dynamodb_client.insert_item(instance, "Startup script completion")
 
     if startup_complete:
         if instance["upload_files"]:
@@ -104,14 +108,13 @@ async def execute_fmbench(instance, post_install_script, remote_script_path):
                 )
             )
 
-            
-
             # Upload and execute the script on the instance
             retries = 0
             max_retries = 2
             retry_sleep = 60
             while True:
                 logger.info("Startup Script complete, executing fmbench now")
+                dynamodb_client.insert_item(instance, "Executing Fmbench")
                 script_output = await asyncio.get_event_loop().run_in_executor(
                     executor,
                     upload_and_execute_script_invoke_shell,
@@ -121,16 +124,22 @@ async def execute_fmbench(instance, post_install_script, remote_script_path):
                     formatted_script,
                     remote_script_path,
                 )
-                logger.info(f"Script Output from {instance['hostname']}:\n{script_output}")
+                logger.info(
+                    f"Script Output from {instance['hostname']}:\n{script_output}"
+                )
                 if script_output != "":
                     break
                 else:
                     logger.error(f"post startup script not successfull after {retries}")
                     if retries < max_retries:
-                        logger.error(f"post startup script retries={retries}, trying after a {retry_sleep}s sleep")
+                        logger.error(
+                            f"post startup script retries={retries}, trying after a {retry_sleep}s sleep"
+                        )
                     else:
-                        logger.error(f"post startup script retries={retries}, not retrying any more, benchmarking "
-                                    f"for instance={instance} will fail....")
+                        logger.error(
+                            f"post startup script retries={retries}, not retrying any more, benchmarking "
+                            f"for instance={instance} will fail...."
+                        )
                         break
                 time.sleep(retry_sleep)
                 retries += 1
@@ -145,6 +154,7 @@ async def execute_fmbench(instance, post_install_script, remote_script_path):
                 instance["fmbench_complete_timeout"],
                 SCRIPT_CHECK_INTERVAL_IN_SECONDS,
             )
+            dynamodb_client.insert_item(instance, "Fmbench Complete")
 
             logger.info("Going to get fmbench.log from the instance now")
             results_folder = os.path.join(
@@ -170,6 +180,7 @@ async def execute_fmbench(instance, post_install_script, remote_script_path):
                 )
         if globals.config_data["run_steps"]["delete_ec2_instance"]:
             delete_ec2_instance(instance["instance_id"], instance["region"])
+            dynamodb_client.insert_item(instance, "Cleanup")
             instance_id_list.remove(instance["instance_id"])
 
 
@@ -197,6 +208,7 @@ async def main():
 
 
 if __name__ == "__main__":
+    run_uid = str(uuid.uuid4())
     parser = argparse.ArgumentParser(
         description="Run FMBench orchestrator with a specified config file."
     )
@@ -217,29 +229,40 @@ if __name__ == "__main__":
     parser.add_argument(
         "--fmbench-config-file",
         type=str,
-        help="Config file to use with fmbench, this is used if the orchestrator config file uses the \"{{config_file}}\" format for specifying the fmbench config file",
-        required=False
+        help='Config file to use with fmbench, this is used if the orchestrator config file uses the "{{config_file}}" format for specifying the fmbench config file',
+        required=False,
     )
     parser.add_argument(
         "--write-bucket",
         type=str,
         help="S3 bucket to store model files for benchmarking on SageMaker",
-        required=False
+        required=False,
     )
 
     args = parser.parse_args()
     logger.info(f"main, {args} = args")
 
-    globals.config_data = load_yaml_file(args.config_file,
-                                         args.ami_mapping_file,
-                                         args.fmbench_config_file,
-                                         args.write_bucket)
+    globals.config_data = load_yaml_file(
+        args.config_file,
+        args.ami_mapping_file,
+        args.fmbench_config_file,
+        args.write_bucket,
+    )
     logger.info(f"Loaded Config {json.dumps(globals.config_data, indent=2)}")
 
     hf_token_fpath = globals.config_data["aws"].get("hf_token_fpath")
     hf_token: Optional[str] = None
     logger.info(f"Got Hugging Face Token file path from config. {hf_token_fpath}")
     logger.info("Attempting to open it")
+    metric_collection = globals.config_data["aws"].get("metric_collection")
+
+    if metric_collection:
+        logger.info(f"Metric Collection is set to yes, Initializing DynamoDB client," 
+                    f"setting the table name as: {DEFAULT_DYNAMODB_TABLE_NAME}")
+        logger.info(f"Unique ID for this run is {run_uid}")
+        dynamodb_client = DynamoDBHandler(run_uid)
+    else:
+        logger.info("Metric Collection flag is set to No, not intializing DynamoDB client")
 
     if Path(hf_token_fpath).is_file():
         hf_token = Path(hf_token_fpath).read_text().strip()
@@ -278,13 +301,13 @@ if __name__ == "__main__":
             )
 
         logger.info(f"iam arn: {iam_arn}")
-        # WIP Parallelize This.
         num_instances: int = len(globals.config_data["instances"])
         for idx, instance in enumerate(globals.config_data["instances"]):
             idx += 1
             logger.info(
                 f"going to create instance {idx} of {num_instances}, instance={instance}"
             )
+            instance_uid = str(uuid.uuid4())
             deploy: bool = instance.get("deploy", True)
             if deploy is False:
                 logger.warning(
@@ -363,6 +386,7 @@ if __name__ == "__main__":
                 )
                 instance_id_list.append(instance_id)
                 instance_data_map[instance_id] = {
+                    "instance_uid": instance_uid,
                     "fmbench_config": instance["fmbench_config"],
                     "post_startup_script": instance["post_startup_script"],
                     "post_startup_script_params": instance.get(
@@ -398,6 +422,7 @@ if __name__ == "__main__":
                 if PRIVATE_KEY_FNAME:
                     instance_id_list.append(instance_id)
                     instance_data_map[instance_id] = {
+                        "instance_uid": instance_uid,
                         "fmbench_config": instance["fmbench_config"],
                         "post_startup_script": instance["post_startup_script"],
                         "fmbench_complete_timeout": instance[
@@ -423,5 +448,6 @@ if __name__ == "__main__":
         instance_details = generate_instance_details(
             instance_id_list, instance_data_map
         )  # Call the async function
+        
         asyncio.run(main())
     logger.info("all done")
