@@ -1,50 +1,20 @@
-# FMBench Orchestrator
-
-![fmbench_architecture](docs/img/Fmbench-Orchestrator-Architecture-v1.png)
-
 ## Overview
 
-The **FMBench Orchestrator** is a tool designed to automate the deployment and management of `FMBench` for benchmarking on Amazon EC2, Amazon SageMaker and Amazon Bedrock. In case of benchmarking on EC2, we could benchmark on multiple instances simultaneously, and these instances can be of different instance types (so you could run `g6e`, `p4de` and a `trn1` instances via the same config file), in different AWS regions and also test multiple `FMBench` config files. This orchestrator automates the creation of Security Groups, Key Pairs, EC2 instances, runs `FMBench` for a specific config, retrieves the results, and shuts down the instances after completion. Thus it **simplifies the benchmarking process (no more manual creation of SageMaker Notebooks, EC2 instances and cleanup, downloading results folder) and ensures a streamlined and scalable workflow**.
-
-```
-+---------------------------+
-| Initialization            |
-| (Configure & Setup)       |
-+---------------------------+
-          ↓
-+---------------------------+
-| Instance Creation         |
-| (Launch EC2 Instances)    |
-+---------------------------+
-          ↓
-+---------------------------+
-| FMBENCH Execution         |
-| (Run Benchmark Script)    |
-+---------------------------+
-          ↓
-+---------------------------+
-| Results Collection        |
-| (Download from instances) |
-+---------------------------+
-          ↓
-+---------------------------+
-| Instance Termination      |
-| (Terminate Instances)     |
-+---------------------------+
-```
+The **FMBench Orchestrator** enables the LLM benchmarking of latency, cost and accuracy across various serving stacks and models. It is built with moduler design where users can plug and play with any combination of:  
+![Accuracy trajectory with prompt size](img/fmbench_conceptual_modules.png)
 
 ## Prerequisites
 
 - **IAM ROLE**: You need an active AWS account having an **IAM Role** necessary permissions to create, manage, and terminate EC2 instances. See [this](docs/iam.md) link for the permissions and trust policies that this IAM role needs to have. Call this IAM role as `fmbench-orchestrator`.
 
-    
-- **Service quota**: Your AWS account needs to have appropriately set service quota limits to be able to start the Amazon EC2 instances that you may want to use for benchmarking. This may require you to submit service quota increase requests, use [this link](https://docs.aws.amazon.com/servicequotas/latest/userguide/request-quota-increase.html) for submitting a service quota increase requests. This would usually mean increasing the CPU limits for your accounts, getting quota for certain instance types etc.
+- **Service quota**: Your AWS account needs to have enough **VCPU quota** limits to be able to start the Amazon EC2 instances that you may want to use for benchmarking. This may require you to submit service quota increase requests, use [this link](https://docs.aws.amazon.com/servicequotas/latest/userguide/request-quota-increase.html) for submitting a service quota increase requests. 
 
 - **EC2 Instance**: It is recommended to run the orchestrator on an EC2 instance, attaching the IAM Role with permissions, preferably located in the same AWS region where you plan to launch the multiple EC2 instances (although launching instances across regions is supported as well).
 
     - Use `Ubuntu` as the instance OS, specifically the `ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-20240927` AMI.
     - Use `t3.xlarge` as the instance type with preferably at least 100GB of disk space.
     - Associate the `fmbench-orchestrator` IAM role with this instance.
+
 
 ## Installation
 
@@ -86,7 +56,8 @@ The **FMBench Orchestrator** is a tool designed to automate the deployment and m
     ```
 
 1. **Hugging Face token**:
-
+   Please follow the instructions [here](https://huggingface.co/docs/hub/security-tokens) to get a Hugging Face token.
+   Please also make sure to get **access to the models in HuggingFace**. 
    Most models and tokenizers are downloaded from Hugging Face, to enable this place your Hugging Face token in `/tmp/hf_token.txt`.
 
    ```bash
@@ -95,11 +66,8 @@ The **FMBench Orchestrator** is a tool designed to automate the deployment and m
    echo $hf_token > /tmp/hf_token.txt
    ```
 
-### Steps to run the orchestrator:
-
-You can either use an existing config file included in this repo, such as [`configs/ec2.yml`](configs/ec2.yml) or create your own using the files provided in the [`configs`](configs) directory as a template. Make sure you are in the `fmbench-orchestrator-py311` conda environment. The following command runs benchmarking for the `Llama3-8b` model on an `g6e.2xlarge` and `g6e.4xlarge` instance types.
-
-The following command runs benchmarking on an EC2 instance, see [Benchmark for SageMaker](#benchmark-for-sagemaker) for benchmarking on SageMaker and [Benchmark for Bedrock](#benchmark-for-bedrock) for benchmarking on Bedrock.
+### Run an example experiment:
+In this experiment, we compare the price performance of running Llama3.1-8b on EC2 g6e.2xlarge and g6e.4xlarge.
 
 ```bash
 python main.py --config-file configs/ec2.yml
@@ -113,15 +81,17 @@ Here is a description of all the command line parameters that are supported by t
 - **--infra-config-file** - _optional_, _default=infra.yml_, config file to use with AWS infrastructure
 - **--write-bucket** - _optional_, _default=placeholder_, *this parameter is only needed when benchmarking on SageMaker*, Amazon S3 bucket to store model files for benchmarking on SageMaker
 
-Once the run is completed you can see the `FMBench` results folder downloaded in the `results` directory under the orchestrator, the `fmbench.log` file is also downloaded from the EC2 instances and placed alongside the results folder.
+### Analyze the results
 
-To analyze the results i.e. compare and contrast the price performance of different EC2 instance types that were a part of the run by running an analytics script. The example below shows how to use the `analytcs.py` script to analyze results obtained from running the orchestrator with the [`llama3-8b-g6e-triton.yml`](configs/llama3/8b/llama3-8b-triton-g6e.yml) config file.
+To analyze the results from the above experiment: 
 
 ```{.bashrc}
-python analytics/analytics.py --results-dir results/llama3-8b-g6e-triton --model-id llama3-8b --payload-file payload_en_3000-3840.jsonl --latency-threshold 2
+python analytics/analytics.py --results-dir results/llama3-8b-g6e --model-id llama3-8b --payload-file payload_en_3000-3840.jsonl --latency-threshold 2
 ```
+The results are saved in `fmbench-orchestrator/analytics/results/llama3-8b-g6e/`, including summaries of the results and a heatmap that helps understand which instance type gives the best price performance at the desired scale (transactions/minute) while maintaining the inference latency below a desired threshold.
+Below is one of the output tables about cost comparison. 
+![example_orchestrator_cost_comparison](docs/img/example_orchestrator_cost_comparison.png)
 
-Running the scripts above creates a `results` folder under `analytics` which contains summaries of the results and a heatmap that helps understand which instance type gives the best price performance at the desired scale (transactions/minute) while maintaining the inference latency below a desired threshold.
 
 ## How do I ...
 
@@ -218,3 +188,20 @@ See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more inform
 This project is licensed under the MIT-0 License - see the [LICENSE](LICENSE) file for details.
 
 
+
+
+
+# FMBench Orchestrator
+
+![fmbench_architecture](docs/img/Fmbench-Orchestrator-Architecture-v1.png)
+
+
+
+
+
+
+
+
+You can either use an existing config file included in this repo, such as [`configs/ec2.yml`](configs/ec2.yml) or create your own using the files provided in the [`configs`](configs) directory as a template. Make sure you are in the `fmbench-orchestrator-py311` conda environment. The following command runs benchmarking for the `Llama3-8b` model on an `g6e.2xlarge` and `g6e.4xlarge` instance types.
+
+The following command runs benchmarking on an EC2 instance, see [Benchmark for SageMaker](#benchmark-for-sagemaker) for benchmarking on SageMaker and [Benchmark for Bedrock](#benchmark-for-bedrock) for benchmarking on Bedrock.
