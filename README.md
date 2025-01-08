@@ -1,6 +1,7 @@
 ## Overview
 
-The **FMBench Orchestrator** enables the LLM benchmarking of latency, cost and accuracy across various serving stacks and models. It is built with moduler design where users can plug and play with any combination of:  
+The FMBench Orchestrator automates the LLM benchmarking of latency, cost and accuracy metrics across various **serving stacks** and **models**. It is built with moduler design where users can plug and play with **any combination** of dataset, models, serving stacks, and benchmark metrics:  
+
 ![Accuracy trajectory with prompt size](docs/img/fmbench_conceptual_modules.png)
 
 ## Prerequisites
