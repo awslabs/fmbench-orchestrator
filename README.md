@@ -121,7 +121,7 @@ instances:
   - fmbench:llama3/8b/config-llama3-8b-g6e.4xl-tp-1-mc-max-djl-ec2.yml
 ```
 
-Note that the  [`fmbench: lama3/8b/config-ec2-llama3-8b-g6e-2xlarge.yml`](https://github.com/aws-samples/foundation-model-benchmarking-tool/blob/main/src/fmbench/configs/llama3/8b/config-ec2-llama3-8b-g6e-2xlarge.yml) and []`fmbench: llama3/8b/config-llama3-8b-g6e.4xl-tp-1-mc-max-djl-ec2.yml`](https://github.com/aws-samples/foundation-model-benchmarking-tool/blob/main/src/fmbench/configs/llama3/8b/config-llama3-8b-g6e.4xl-tp-1-mc-max-djl-ec2.yml) files are default config files provided in the FMbench repo.  Thse are the config files that get deployed to the experiment instances. 
+Note that the  [`fmbench: lama3/8b/config-ec2-llama3-8b-g6e-2xlarge.yml`](https://github.com/aws-samples/foundation-model-benchmarking-tool/blob/main/src/fmbench/configs/llama3/8b/config-ec2-llama3-8b-g6e-2xlarge.yml) and [`fmbench: llama3/8b/config-llama3-8b-g6e.4xl-tp-1-mc-max-djl-ec2.yml`](https://github.com/aws-samples/foundation-model-benchmarking-tool/blob/main/src/fmbench/configs/llama3/8b/config-llama3-8b-g6e.4xl-tp-1-mc-max-djl-ec2.yml) files are default config files provided in the FMbench repo.  FMbench orchestrator use these config to launch EC2 instance and deploy the expements on the launched EC2 instance. 
 
 We'll give examples of how to customize these config files in the BYOC (Bring Your Own Config) section below. 
 
@@ -151,12 +151,23 @@ instances:
 
 
 ### Compare Bedrock against SageMaker 
+See [`configs/bedrock.yml`](configs/bedrock.yml) as an example for Bedrock experiments. 
 
-You can benchmark any model(s) on Amazon Bedrock by simply pointing the orchestrator to the desired `FMBench` SageMaker config file. The orchestrator will create an EC2 instance and use that for running `FMBench` benchmarking for Bedrock.  For example the following command line benchmarks the `Llama3.1` models on Bedrock.
+```{.yml}
+instances:
+- instance_type: m7a.xlarge   # Bedrock experiment 
+  <<: *ec2_settings
+  fmbench_config: 
+  - fmbench:bedrock/config-bedrock-llama3-1.yml
 
-```bash
-python main.py --config-file configs/bedrock.yml --fmbench-config-file fmbench:bedrock/config-bedrock-llama3-1.yml
+- instance_type: m7a.xlarge   # SageMaker experiment 
+  <<: *ec2_settings
+  fmbench_config: 
+  - ~/fmbench-orchestrator/configs/byoe/config-llama3-8b-inf2-48xl-tp=8-bs=4-byoe.yml
 ```
+
+The `FMBench` config file for Bedrock is [`fmbench:bedrock/config-bedrock-llama3-1.yml`](https://github.com/aws-samples/foundation-model-benchmarking-tool/blob/main/src/fmbench/configs/bedrock/config-bedrock-llama3-1.yml). You can also customize this config and upload your .yml file to the Orchestrator EC2 instance. 
+
 
 ### Use an existing `FMBench` config file but modify it slightly for my requirements
 
