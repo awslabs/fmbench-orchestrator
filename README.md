@@ -168,7 +168,7 @@ instances:
 
 The `FMBench` config file for Bedrock is [`fmbench:bedrock/config-bedrock-llama3-1.yml`](https://github.com/aws-samples/foundation-model-benchmarking-tool/blob/main/src/fmbench/configs/bedrock/config-bedrock-llama3-1.yml). You can also customize this config and upload your .yml file to the Orchestrator EC2 instance. 
 
-### Run experiments on custom datasets
+### Use custom datasets
 Please see [`ec2_custom_dataset.yml`](configs/ec2_custom_dataset.yml) for an example config file. The custom data is uploaded to the `~/fmbench-orchestrator/byo_dataset` folder on the orchestrator EC2 instance, specified in the `upload_files` section.  
 
 ```{.yml}
