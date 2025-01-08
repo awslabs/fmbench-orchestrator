@@ -1,7 +1,7 @@
 ## Overview
 
 The **FMBench Orchestrator** enables the LLM benchmarking of latency, cost and accuracy across various serving stacks and models. It is built with moduler design where users can plug and play with any combination of:  
-![Accuracy trajectory with prompt size](img/fmbench_conceptual_modules.png)
+![Accuracy trajectory with prompt size](docs/img/fmbench_conceptual_modules.png)
 
 ## Prerequisites
 
@@ -91,6 +91,8 @@ python analytics/analytics.py --results-dir results/llama3-8b-g6e --model-id lla
 The results are saved in `fmbench-orchestrator/analytics/results/llama3-8b-g6e/`, including summaries of the results and a heatmap that helps understand which instance type gives the best price performance at the desired scale (transactions/minute) while maintaining the inference latency below a desired threshold.
 Below is one of the output tables about cost comparison. 
 ![example_orchestrator_cost_comparison](docs/img/example_orchestrator_cost_comparison.png)
+
+
 
 
 ## How do I ...
