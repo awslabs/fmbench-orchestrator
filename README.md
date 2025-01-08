@@ -103,10 +103,10 @@ Below is one of the output tables about cost comparison.
 
 
 ## How do I ...
-The experiment configurations are specified in the config YML file, in the 'instances' section. FMbench Orchestrator will run each experiment in parallel, and then collect the results from each experiment onto the orchestrator EC2 instance. See [configuration guide](docs/config_guide.md) for details on the orchestrator config file.
+The experiment configurations are specified in the config YML file, in the `instances` section. FMbench Orchestrator will run each experiment in parallel, and then collect the results from each experiment onto the orchestrator EC2 instance. See [configuration guide](docs/config_guide.md) for details on the orchestrator config file.
 
-### Experiments on EC2 instance types
-See `configs/ec2.yml` as an example. The 'instances' section has 2 experiments, one using g6e.2xlarge and the other using g6e.4xlarge. 
+### Compare different types of EC2 instances
+See [`configs/ec2.yml`](configs/ec2.yml) as an example for EC2 experiments. The `instances` section has 2 experiments, one using g6e.2xlarge and the other using g6e.4xlarge. 
 
 ```{.yml}
 instances:
@@ -121,29 +121,30 @@ instances:
   - fmbench:llama3/8b/config-llama3-8b-g6e.4xl-tp-1-mc-max-djl-ec2.yml
 ```
 
-Note that the  `fmbench: lama3/8b/config-ec2-llama3-8b-g6e-2xlarge.yml` and `fmbench: llama3/8b/config-llama3-8b-g6e.4xl-tp-1-mc-max-djl-ec2.yml` are default config files provided in the FMbench repo (see [link](https://github.com/aws-samples/foundation-model-benchmarking-tool/blob/main/src/fmbench/configs/llama3/8b/config-ec2-llama3-8b-g6e-2xlarge.yml) and [link](https://github.com/aws-samples/foundation-model-benchmarking-tool/blob/main/src/fmbench/configs/llama3/8b/config-llama3-8b-g6e.4xl-tp-1-mc-max-djl-ec2.yml) ).  Thse are the config files that get deployed to the experiment instances. 
+Note that the  `fmbench: lama3/8b/config-ec2-llama3-8b-g6e-2xlarge.yml` and `fmbench: llama3/8b/config-llama3-8b-g6e.4xl-tp-1-mc-max-djl-ec2.yml` files are default config files provided in the FMbench repo (see [link](https://github.com/aws-samples/foundation-model-benchmarking-tool/blob/main/src/fmbench/configs/llama3/8b/config-ec2-llama3-8b-g6e-2xlarge.yml) and [link](https://github.com/aws-samples/foundation-model-benchmarking-tool/blob/main/src/fmbench/configs/llama3/8b/config-llama3-8b-g6e.4xl-tp-1-mc-max-djl-ec2.yml) ).  Thse are the config files that get deployed to the experiment instances. 
 
 We'll give examples of how to customize these config files in the BYOC (Bring Your Own Config) section below. 
 
 
 ### Compare EC2 against SageMaker
-The experiment config file of Sagemaker can be found in `configs/sagemaker.yml`. 
+LLM can be hosted on an [SageMaker endpoint](https://docs.aws.amazon.com/sagemaker/latest/dg/how-it-works-deployment.html). The experiment config file of Sagemaker can be found in `configs/sagemaker.yml`. 
 
 ```
 instances:
-- instance_type: m7a.xlarge
+- instance_type: m7a.xlarge  # SageMaker experiment 
   <<: *ec2_settings
   fmbench_config: 
   - {{config_file}}
   
-- instance_type: g6e.2xlarge
+- instance_type: g6e.2xlarge  # EC2 experiment 
   <<: *ec2_settings    
   fmbench_config: 
   - fmbench:llama3/8b/config-ec2-llama3-8b-g6e-2xlarge.yml
 
 ```
 
-Note that 
+Although the model is deployed on Sagemaker endpoint, this experiment is still require an EC2 instance. This instance is used to collect the experiment results, thus we only use a small instance, m7a.xlarge. 
+
 
 ## Benchmark for Bedrock
 
