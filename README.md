@@ -121,20 +121,27 @@ instances:
   - fmbench:llama3/8b/config-llama3-8b-g6e.4xl-tp-1-mc-max-djl-ec2.yml
 ```
 
-Note that the  `fmbench: lama3/8b/config-ec2-llama3-8b-g6e-2xlarge.yml` and `fmbench: llama3/8b/config-llama3-8b-g6e.4xl-tp-1-mc-max-djl-ec2.yml` files are default config files provided in the FMbench repo (see [link](https://github.com/aws-samples/foundation-model-benchmarking-tool/blob/main/src/fmbench/configs/llama3/8b/config-ec2-llama3-8b-g6e-2xlarge.yml) and [link](https://github.com/aws-samples/foundation-model-benchmarking-tool/blob/main/src/fmbench/configs/llama3/8b/config-llama3-8b-g6e.4xl-tp-1-mc-max-djl-ec2.yml) ).  Thse are the config files that get deployed to the experiment instances. 
+Note that the  [`fmbench: lama3/8b/config-ec2-llama3-8b-g6e-2xlarge.yml`](https://github.com/aws-samples/foundation-model-benchmarking-tool/blob/main/src/fmbench/configs/llama3/8b/config-ec2-llama3-8b-g6e-2xlarge.yml) and []`fmbench: llama3/8b/config-llama3-8b-g6e.4xl-tp-1-mc-max-djl-ec2.yml`](https://github.com/aws-samples/foundation-model-benchmarking-tool/blob/main/src/fmbench/configs/llama3/8b/config-llama3-8b-g6e.4xl-tp-1-mc-max-djl-ec2.yml) files are default config files provided in the FMbench repo.  Thse are the config files that get deployed to the experiment instances. 
 
 We'll give examples of how to customize these config files in the BYOC (Bring Your Own Config) section below. 
 
 
-### Compare EC2 against SageMaker
+### Compare SageMaker against EC2
 LLM can be hosted on an [SageMaker endpoint](https://docs.aws.amazon.com/sagemaker/latest/dg/how-it-works-deployment.html). The experiment config file of Sagemaker can be found in `configs/sagemaker.yml`. 
 
-```
+The SageMaker experiment requires the endpoint already deployed.
+You first need to write a `FMBench` config file for SageMaker. One option is to make a copy of [`config-llama3-8b-inf2-48xl-tp=8-bs=4-byoe.yml`](https://github.com/aws-samples/foundation-model-benchmarking-tool/blob/main/src/fmbench/configs/llama3/8b/config-llama3-8b-inf2-48xl-tp%3D8-bs%3D4-byoe.yml), name it `config-sagemaker.yml`, and modify the values in the `experiments` section.  
+
+Then upload the config_sagemaker.yml to the `~/fmbench-orchestrator/configs/byoe` folder on your Orchestrator EC2 instance. 
+
+The orchestrator config YML file should have the following:
+
+```{.yml}
 instances:
-- instance_type: m7a.xlarge  # SageMaker experiment 
+- instance_type: m7a.xlarge   # SageMaker experiment 
   <<: *ec2_settings
   fmbench_config: 
-  - {{config_file}}
+  - ~/fmbench-orchestrator/configs/byoe/config-llama3-8b-inf2-48xl-tp=8-bs=4-byoe.yml
   
 - instance_type: g6e.2xlarge  # EC2 experiment 
   <<: *ec2_settings    
@@ -143,10 +150,8 @@ instances:
 
 ```
 
-Although the model is deployed on Sagemaker endpoint, this experiment is still require an EC2 instance. This instance is used to collect the experiment results, thus we only use a small instance, m7a.xlarge. 
 
-
-## Benchmark for Bedrock
+### Compare Bedrock against SageMaker 
 
 You can benchmark any model(s) on Amazon Bedrock by simply pointing the orchestrator to the desired `FMBench` SageMaker config file. The orchestrator will create an EC2 instance and use that for running `FMBench` benchmarking for Bedrock.  For example the following command line benchmarks the `Llama3.1` models on Bedrock.
 
