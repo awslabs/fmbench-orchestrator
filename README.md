@@ -9,20 +9,20 @@ The `FMBench Orchestrator` **automates the LLM benchmarking**. It is built with 
 ## Try it out 
 Follow the following steps and get your infrastructure cost optimization strategy for running Llama3.1-8b in less than 30 mins. 
 
-### Prerequisites
+#### Prerequisites
 
 - **IAM ROLE**: You need an active AWS account having an **IAM Role** necessary permissions to create, manage, and terminate EC2 instances. See [this](docs/iam.md) link for the permissions and trust policies that this IAM role needs to have. Call this IAM role as `fmbench-orchestrator`.
 
 - **Service quota**: Your AWS account needs to have enough **VCPU quota** to launch the Amazon EC2 instances if your LLM serving stack is EC2. In case you need to request a quota increase, please refer to [this link](https://docs.aws.amazon.com/servicequotas/latest/userguide/request-quota-increase.html). 
 
-- **EC2 Instance**: It is recommended to run the orchestrator on an EC2 instance preferably located in the same AWS region where you plan to host your LLM (although launching instances across regions is supported as well).
+- **An Orchestrator EC2 Instance**: It is recommended to run the orchestrator on an EC2 instance preferably located in the same AWS region where you plan to host your LLM (although launching instances across regions is supported as well).
 
     - Use `Ubuntu` as the instance OS, specifically the `ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-20240927` AMI.
     - Use `t3.xlarge` as the instance type with preferably at least 100GB of disk space.
     - Associate the `fmbench-orchestrator` IAM role with this instance.
 
 
-## Installation
+#### Install FMBench-Orchestrator on EC2
 
 1. **Install `conda`**
 
@@ -41,7 +41,7 @@ Follow the following steps and get your infrastructure cost optimization strateg
     cd fmbench-orchestrator
     ```
 
-### Conda Environment Setup
+#### Conda Environment Setup
 
 1. **Create a Conda Environment with Python 3.11**:
 
@@ -72,7 +72,7 @@ Follow the following steps and get your infrastructure cost optimization strateg
    echo $hf_token > /tmp/hf_token.txt
    ```
 
-### Run an example experiment:
+#### Run an example experiment:
 In this experiment, we compare the price performance of running Llama3.1-8b on EC2 g6e.2xlarge and g6e.4xlarge.
 
 ```bash
@@ -87,7 +87,8 @@ Here is a description of all the command line parameters that are supported by t
 - **--infra-config-file** - _optional_, _default=infra.yml_, config file to use with AWS infrastructure
 - **--write-bucket** - _optional_, _default=placeholder_, *this parameter is only needed when benchmarking on SageMaker*, Amazon S3 bucket to store model files for benchmarking on SageMaker
 
-### Analyze the results
+
+#### Analyze the results
 
 To analyze the results from the above experiment: 
 
@@ -102,28 +103,47 @@ Below is one of the output tables about cost comparison.
 
 
 ## How do I ...
+The experiment configurations are specified in the config YML file, in the 'instances' section. FMbench Orchestrator will run each experiment in parallel, and then collect the results from each experiment onto the orchestrator EC2 instance. See [configuration guide](docs/config_guide.md) for details on the orchestrator config file.
 
-See [configuration guide](docs/config_guide.md) for details on the orchestrator config file.
+### Experiments on EC2 instance types
+See `configs/ec2.yml` as an example. The 'instances' section has 2 experiments, one using g6e.2xlarge and the other using g6e.4xlarge. 
 
-### Benchmark for EC2
+```{.yml}
+instances:
+- instance_type: g6e.2xlarge
+  <<: *ec2_settings    
+  fmbench_config: 
+  - fmbench:llama3/8b/config-ec2-llama3-8b-g6e-2xlarge.yml
 
-Take an existing config file from the [`configs`](configs/) folder, create a copy and edit it as needed. You would typically only need to modify the `instances` section of the config file to either modify the instance type and config file or add additional types. For example the following command line benchmarks the `Llama3.1-8b` models on `g6e` EC2 instance types.
-
-```bash
-python main.py --config-file configs/ec2.yml
+- instance_type: g6e.4xlarge
+  <<: *ec2_settings
+  fmbench_config: 
+  - fmbench:llama3/8b/config-llama3-8b-g6e.4xl-tp-1-mc-max-djl-ec2.yml
 ```
 
-## Benchmark for SageMaker
+Note that the  `fmbench: lama3/8b/config-ec2-llama3-8b-g6e-2xlarge.yml` and `fmbench: llama3/8b/config-llama3-8b-g6e.4xl-tp-1-mc-max-djl-ec2.yml` are default config files provided in the FMbench repo (see [link](https://github.com/aws-samples/foundation-model-benchmarking-tool/blob/main/src/fmbench/configs/llama3/8b/config-ec2-llama3-8b-g6e-2xlarge.yml) and [link](https://github.com/aws-samples/foundation-model-benchmarking-tool/blob/main/src/fmbench/configs/llama3/8b/config-llama3-8b-g6e.4xl-tp-1-mc-max-djl-ec2.yml) ).  Thse are the config files that get deployed to the experiment instances. 
 
-You can benchmark any model(s) on Amazon SageMaker by simply pointing the orchestrator to the desired `FMBench` SageMaker config file. The orchestrator will create an EC2 instance and use that for running `FMBench` benchmarking for SageMaker. For example the following command line benchmarks the `Llama3.1-8b` models on `ml.g5` instance types on SageMaker.
+We'll give examples of how to customize these config files in the BYOC (Bring Your Own Config) section below. 
 
-```bash
-# provide the name of an S3 bucket in which you want
-# SageMaker to store the model files (for models downloaded
-# from Hugging Face)
-write_bucket=your-bucket-name
-python main.py --config-file configs/sagemaker.yml --fmbench-config-file fmbench:llama3.1/8b/config-llama3.1-8b-g5.2xl-g5.4xl-sm.yml --write-bucket $write_bucket
+
+### Compare EC2 against SageMaker
+The experiment config file of Sagemaker can be found in `configs/sagemaker.yml`. 
+
 ```
+instances:
+- instance_type: m7a.xlarge
+  <<: *ec2_settings
+  fmbench_config: 
+  - {{config_file}}
+  
+- instance_type: g6e.2xlarge
+  <<: *ec2_settings    
+  fmbench_config: 
+  - fmbench:llama3/8b/config-ec2-llama3-8b-g6e-2xlarge.yml
+
+```
+
+Note that 
 
 ## Benchmark for Bedrock
 
@@ -187,6 +207,13 @@ The orchestrator would in this case first run benchmarking for the first file in
 Contributions are welcome! Please fork the repository and submit a pull request with your changes. For major changes, please open an issue first to discuss what you would like to change.
 
 
+
+## In case you are curious 
+
+Below is the conceptual architecture of the FMBench Orchestrator. 
+![fmbench_architecture](docs/img/Fmbench-Orchestrator-Architecture-v1.png)
+
+
 ## Security
 
 See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
@@ -196,20 +223,3 @@ See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more inform
 This project is licensed under the MIT-0 License - see the [LICENSE](LICENSE) file for details.
 
 
-
-
-
-# FMBench Orchestrator
-
-![fmbench_architecture](docs/img/Fmbench-Orchestrator-Architecture-v1.png)
-
-
-
-
-
-
-
-
-You can either use an existing config file included in this repo, such as [`configs/ec2.yml`](configs/ec2.yml) or create your own using the files provided in the [`configs`](configs) directory as a template. Make sure you are in the `fmbench-orchestrator-py311` conda environment. The following command runs benchmarking for the `Llama3-8b` model on an `g6e.2xlarge` and `g6e.4xlarge` instance types.
-
-The following command runs benchmarking on an EC2 instance, see [Benchmark for SageMaker](#benchmark-for-sagemaker) for benchmarking on SageMaker and [Benchmark for Bedrock](#benchmark-for-bedrock) for benchmarking on Bedrock.
