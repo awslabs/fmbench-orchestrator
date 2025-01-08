@@ -127,10 +127,9 @@ We'll give examples of how to customize these config files in the BYOC (Bring Yo
 
 
 ### Compare SageMaker against EC2
-LLM can be hosted on an [SageMaker endpoint](https://docs.aws.amazon.com/sagemaker/latest/dg/how-it-works-deployment.html). The experiment config file of Sagemaker can be found in `configs/sagemaker.yml`. 
+LLM can be hosted on an [SageMaker endpoint](https://docs.aws.amazon.com/sagemaker/latest/dg/how-it-works-deployment.html). This experiment requires the SageMaker endpoint already deployed.
 
-The SageMaker experiment requires the endpoint already deployed.
-You first need to write a `FMBench` config file for SageMaker. One option is to make a copy of [`config-llama3-8b-inf2-48xl-tp=8-bs=4-byoe.yml`](https://github.com/aws-samples/foundation-model-benchmarking-tool/blob/main/src/fmbench/configs/llama3/8b/config-llama3-8b-inf2-48xl-tp%3D8-bs%3D4-byoe.yml), name it `config-sagemaker.yml`, and modify the values in the `experiments` section.  
+You first need to write a `FMBench` config file for SageMaker. One option is to make a copy of [`config-llama3-8b-inf2-48xl-tp=8-bs=4-byoe.yml`](https://github.com/aws-samples/foundation-model-benchmarking-tool/blob/main/src/fmbench/configs/llama3/8b/config-llama3-8b-inf2-48xl-tp%3D8-bs%3D4-byoe.yml), name it `config-sagemaker.yml`, and modify the values in the `experiments` section, such as the `endpoint_name`, `instance_type` and `model_id`. 
 
 Then upload the config_sagemaker.yml to the `~/fmbench-orchestrator/configs/byoe` folder on your Orchestrator EC2 instance. 
 
