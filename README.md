@@ -105,7 +105,7 @@ Below is one of the output tables about cost comparison.
 ## How do I ...
 The experiment configurations are specified in the config YML file, in the `instances` section. FMbench Orchestrator will run each experiment in parallel, and then collect the results from each experiment onto the orchestrator EC2 instance. See [configuration guide](docs/config_guide.md) for details on the orchestrator config file.
 
-### Compare different types of EC2 instances
+### Run cost|performance comparison between different types of EC2 instances
 See [`configs/ec2.yml`](configs/ec2.yml) as an example for EC2 experiments. The `instances` section has 2 experiments, one using g6e.2xlarge and the other using g6e.4xlarge. 
 
 ```{.yml}
@@ -126,7 +126,7 @@ Note that the  [`fmbench: lama3/8b/config-ec2-llama3-8b-g6e-2xlarge.yml`](https:
 An example of using customized `fmbench` config file is given in the [Compare SageMaker against EC2](#compare-sagemaker-against-ec2) section below. 
 
 
-### Compare SageMaker against EC2
+### Run cost|performance comparison between SageMaker and EC2
 LLM can be hosted on an [SageMaker endpoint](https://docs.aws.amazon.com/sagemaker/latest/dg/how-it-works-deployment.html). This experiment requires the SageMaker endpoint already deployed.
 
 You first need to write a `FMBench` config file for SageMaker. One option is to make a copy of [`config-llama3-8b-inf2-48xl-tp=8-bs=4-byoe.yml`](https://github.com/aws-samples/foundation-model-benchmarking-tool/blob/main/src/fmbench/configs/llama3/8b/config-llama3-8b-inf2-48xl-tp%3D8-bs%3D4-byoe.yml), name it `config-sagemaker.yml`, and modify the values in the `experiments` section, such as the `endpoint_name`, `instance_type` and `model_id`. 
@@ -150,7 +150,7 @@ instances:
 ```
 
 
-### Compare Bedrock against SageMaker 
+### Run cost|performance comparison between Bedrock and SageMaker 
 See [`configs/bedrock.yml`](configs/bedrock.yml) as an example for Bedrock experiments. 
 
 ```{.yml}
@@ -184,11 +184,12 @@ instances:
     remote: /tmp/fmbench-read/configs/
 ```
 
-### Get accuracy metrics on custom dataset
+### Compare the accuracy when predicting on custom dataset
+FMBench-orchestrator supports for evaluating candidate models using Majority Voting with a Panel of LLM Evaluators (PoLL). Before running the experiment, please enable **model access** in Bedrock to the judge models: **Llama3-70b**, **Cohere command-r-v1** and **claude 3 Sonnet**. 
 
-First, createa a config file specifying accuracy measurement related info, such as `ground_truth`,  `question_col_key`. You can use [config-llama3.1-8b-g5.2xl-g5.4xl-sm.yml](https://github.com/aws-samples/foundation-model-benchmarking-tool/blob/e82810862e8dd21e4914d925c4be7bf0be9f6afe/src/fmbench/configs/llama3.1/8b/config-llama3.1-8b-g5.2xl-g5.4xl-sm.yml) as an example, and modify based on your experiment. 
+First, createa a config file specifying accuracy measurement related info, such as `ground_truth`,  `question_col_key`. You can copy [config-llama3.1-8b-g5.2xl-g5.4xl-sm.yml](https://github.com/aws-samples/foundation-model-benchmarking-tool/blob/e82810862e8dd21e4914d925c4be7bf0be9f6afe/src/fmbench/configs/llama3.1/8b/config-llama3.1-8b-g5.2xl-g5.4xl-sm.yml) as an example, and modify based on your experiment. 
 
-Here are a few key parameters in this config file:
+Here are the parameters to update in this config file:
 
 ```{.yml}
 run_steps:
@@ -196,7 +197,7 @@ run_steps:
     1_generate_data.ipynb: yes
     2_deploy_model.ipynb: yes
     3_run_inference.ipynb: yes
-    4_get_evaluations.ipynb: yes     # This is the step to get accuracy metrics
+    4_get_evaluations.ipynb: yes     # Make sure to set this step to "yes".
     5_model_metric_analysis.ipynb: yes
     6_cleanup.ipynb: yes
 
