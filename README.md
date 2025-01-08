@@ -123,7 +123,7 @@ instances:
 
 Note that the  [`fmbench: lama3/8b/config-ec2-llama3-8b-g6e-2xlarge.yml`](https://github.com/aws-samples/foundation-model-benchmarking-tool/blob/main/src/fmbench/configs/llama3/8b/config-ec2-llama3-8b-g6e-2xlarge.yml) and [`fmbench: llama3/8b/config-llama3-8b-g6e.4xl-tp-1-mc-max-djl-ec2.yml`](https://github.com/aws-samples/foundation-model-benchmarking-tool/blob/main/src/fmbench/configs/llama3/8b/config-llama3-8b-g6e.4xl-tp-1-mc-max-djl-ec2.yml) files are default config files provided in the FMbench repo.  FMbench orchestrator use these config to launch EC2 instance and deploy the expements on the launched EC2 instance. 
 
-We'll give examples of how to customize these config files in the BYOC (Bring Your Own Config) section below. 
+An example of using customized `fmbench` config file is given in the [Compare SageMaker against EC2](#compare-sagemaker-against-ec2) section below. 
 
 
 ### Compare SageMaker against EC2
