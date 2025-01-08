@@ -168,25 +168,47 @@ instances:
 
 The `FMBench` config file for Bedrock is [`fmbench:bedrock/config-bedrock-llama3-1.yml`](https://github.com/aws-samples/foundation-model-benchmarking-tool/blob/main/src/fmbench/configs/bedrock/config-bedrock-llama3-1.yml). You can also customize this config and upload your .yml file to the Orchestrator EC2 instance. 
 
+### Run experiments on custom datasets
+Please see [`ec2_custom_dataset.yml`](configs/ec2_custom_dataset.yml) for an example config file. The custom data is uploaded to the `~/fmbench-orchestrator/byo_dataset` folder on the orchestrator EC2 instance, specified in the `upload_files` section.  
 
-### Use an existing `FMBench` config file but modify it slightly for my requirements
+```{.yml}
+instances:
+- instance_type: g6e.2xlarge
+  <<: *ec2_settings
+  fmbench_config: 
+  - /home/ubuntu/fmbench-orchestrator/byo_fmbench_configs/config-ec2-llama3-8b-g6e-2xlarge_eval.yml
+  upload_files:
+  - local: byo_dataset/custom.jsonl       ## custom dataset
+    remote: /tmp/fmbench-read/source_data/
+  - local: analytics/pricing.yml
+    remote: /tmp/fmbench-read/configs/
+```
 
-1. Download an `FMBench` config file from the [`FMBench repo`](https://github.com/aws-samples/foundation-model-benchmarking-tool/tree/main/src/fmbench/configs) and place it in the [`configs/fmbench`](./configs/fmbench/) folder.
-1. Modify the downloaded config as needed.
-1. Update the `instance -> fmench_config` section for the instance that needs to use this file to point to the updated config file in `fmbench/configs` so for example if the updated config file was `config-ec2-llama3-8b-g6e-2xlarge-custom.yml` then the following parameter:
+### Get accuracy metrics on custom dataset
 
-    ```{.bashrc}
-    fmbench_config: 
-    - fmbench:llama3/8b/config-ec2-llama3-8b-g6e-2xlarge.yml
-    ```
-      would be changed to:
+First, createa a config file specifying accuracy measurement related info, such as `ground_truth`,  `question_col_key`. You can use [config-llama3.1-8b-g5.2xl-g5.4xl-sm.yml](https://github.com/aws-samples/foundation-model-benchmarking-tool/blob/e82810862e8dd21e4914d925c4be7bf0be9f6afe/src/fmbench/configs/llama3.1/8b/config-llama3.1-8b-g5.2xl-g5.4xl-sm.yml) as an example, and modify based on your experiment. 
 
-    ```{.bashrc}
-    fmbench_config: 
-    - configs/fmbench/config-ec2-llama3-8b-g6e-2xlarge-custom.yml
-    ```
+Here are a few key parameters in this config file:
 
-    The orchestrator would now upload the custom config on the EC2 instance being used for benchmarking.
+```{.yml}
+run_steps:
+    0_setup.ipynb: yes
+    1_generate_data.ipynb: yes
+    2_deploy_model.ipynb: yes
+    3_run_inference.ipynb: yes
+    4_get_evaluations.ipynb: yes     # This is the step to get accuracy metrics
+    5_model_metric_analysis.ipynb: yes
+    6_cleanup.ipynb: yes
+
+datasets:
+  prompt_template_keys:
+  - input
+  - context
+  ground_truth_col_key: answers      # The name of the answer filed in your custom data 
+  question_col_key: input            # The name of the question field in your custom data 
+
+```
+
 
 ### Provide a custom prompt/custom tokenizer for my benchmarking test
 
