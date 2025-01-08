@@ -1,16 +1,21 @@
-## Overview
+<h1 align="center">
+        <img src="https://github.com/aws-samples/foundation-model-benchmarking-tool/blob/main/img/fmbt-small.png?raw=true" width="25"></img> FMBench Orchestrator
+</h1>
 
-The FMBench Orchestrator automates the LLM benchmarking of latency, cost and accuracy metrics across various **serving stacks** and **models**. It is built with moduler design where users can plug and play with **any combination** of dataset, models, serving stacks, and benchmark metrics:  
+The `FMBench Orchestrator` **automates the LLM benchmarking**. It is built with moduler design where users can plug and play with **any combination** of dataset, models, serving stacks, and benchmark metrics:  
 
 ![Accuracy trajectory with prompt size](docs/img/fmbench_conceptual_modules.png)
 
-## Prerequisites
+## Try it out 
+Follow the following steps and get your infrastructure cost optimization strategy for running Llama3.1-8b in less than 30 mins. 
+
+### Prerequisites
 
 - **IAM ROLE**: You need an active AWS account having an **IAM Role** necessary permissions to create, manage, and terminate EC2 instances. See [this](docs/iam.md) link for the permissions and trust policies that this IAM role needs to have. Call this IAM role as `fmbench-orchestrator`.
 
-- **Service quota**: Your AWS account needs to have enough **VCPU quota** limits to be able to start the Amazon EC2 instances that you may want to use for benchmarking. This may require you to submit service quota increase requests, use [this link](https://docs.aws.amazon.com/servicequotas/latest/userguide/request-quota-increase.html) for submitting a service quota increase requests. 
+- **Service quota**: Your AWS account needs to have enough **VCPU quota** to launch the Amazon EC2 instances if your LLM serving stack is EC2. In case you need to request a quota increase, please refer to [this link](https://docs.aws.amazon.com/servicequotas/latest/userguide/request-quota-increase.html). 
 
-- **EC2 Instance**: It is recommended to run the orchestrator on an EC2 instance, attaching the IAM Role with permissions, preferably located in the same AWS region where you plan to launch the multiple EC2 instances (although launching instances across regions is supported as well).
+- **EC2 Instance**: It is recommended to run the orchestrator on an EC2 instance preferably located in the same AWS region where you plan to host your LLM (although launching instances across regions is supported as well).
 
     - Use `Ubuntu` as the instance OS, specifically the `ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-20240927` AMI.
     - Use `t3.xlarge` as the instance type with preferably at least 100GB of disk space.
