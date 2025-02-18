@@ -254,6 +254,12 @@ if __name__ == "__main__":
         help="GitHub repo for FMBench, if set then then this repo is used for installing FMBench rather than doing an FMBench install from PyPI. Default is None i.e. use FMBench package from PyPi",
         required=False
     )
+    parser.add_argument(
+        "--fmbench-branch",
+        type=str,
+        help="GitHub repo branch for FMBench, if set then this repo's branch is used for installing FMBench rather than doing an FMBench install from PyPI. Default is None i.e. use FMBench package from PyPi",
+        required=False
+    )
 
     args = parser.parse_args()
     logger.info(f"main, {args} = args")
@@ -330,7 +336,7 @@ if __name__ == "__main__":
                 # Replace the hf token in the bash script to pull the HF model
                 user_data_script = user_data_script.replace("__HF_TOKEN__", hf_token)
                 user_data_script = user_data_script.replace("__neuron__", "True")
-                logger.info(f"FMBench latest is set to {args.fmbench_latest}, fmbench_repo={args.fmbench_repo}")
+                logger.info(f"FMBench latest is set to {args.fmbench_latest}, fmbench_repo={args.fmbench_repo}, fmbench_branch={args.fmbench_branch}")
                 if args.fmbench_latest is True and args.fmbench_repo is None:
                     # you do not want to download FMBench from Pip but dont have a specific fork that you want 
                     # to use for FMBench so we will default to https://github.com/aws-samples/foundation-model-benchmarking-tool
@@ -340,9 +346,18 @@ if __name__ == "__main__":
                     # you want to use a custom repo but did not set the fmbench_latest flag, that is fine, we will set it here
                     args.fmbench_latest = True
                     logger.info(f"FMBench latest is now set to {args.fmbench_latest}, fmbench_repo is set to {args.fmbench_repo}")
+                # Handle branch selection logic
+                fmbench_branch = "None"  
+                if args.fmbench_repo is not None and args.fmbench_repo != "None":
+                    if hasattr(args, 'fmbench_branch') and args.fmbench_branch is not None:
+                        fmbench_branch = args.fmbench_branch
+                        logger.info(f"Using specified branch: {fmbench_branch} for repo: {args.fmbench_repo}")
+                    else:
+                        logger.info(f"No branch specified, will use default branch for repo: {args.fmbench_repo}")
 
                 user_data_script = user_data_script.replace("__fmbench_latest__", str(args.fmbench_latest))
                 user_data_script = user_data_script.replace("__fmbench_repo__", str(args.fmbench_repo))
+                user_data_script = user_data_script.replace("__fmbench_branch__", str(fmbench_branch))
                 logger.info(f"User data script: {user_data_script}")
 
             if instance.get("instance_id") is None:

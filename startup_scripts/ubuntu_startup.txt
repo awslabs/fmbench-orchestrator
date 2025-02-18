@@ -40,18 +40,38 @@ fmbench_latest="__fmbench_latest__"  # You can set this to "False" to use pip in
 fmbench_repo="__fmbench_repo__"  # replaced with None or 
                                  # or https://github.com/aws-samples/foundation-model-benchmarking-tool.git
                                  # or a custom user provided repo
+fmbench_branch="__fmbench_branch__"  # specify the branch name here
 
 # Conditional installation based on fmbench_latest flag
-if [ "$fmbench_latest" = "True" ]; then    
-    # Clone the repository
-    git clone $fmbench_repo
-    
-    # Change to the repository directory
-    cd foundation-model-benchmarking-tool
-    
-    # Build fmbench and install
-    uv build
-    uv pip install -U dist/*.whl
+if [ "$fmbench_latest" = "True" ]; then
+    if [ -n "$fmbench_repo" ] && [ "$fmbench_repo" != "None" ]; then
+        # Clone the repository
+        git clone $fmbench_repo
+        
+        # Dynamically get the repository directory name from the URL.
+        # This strips a trailing .git if present.
+        repo_dir=$(basename "$fmbench_repo" .git)
+        
+        # Change into the repository directory
+        if [ -d "$repo_dir" ]; then
+            cd "$repo_dir" || { echo "Error: Cannot change directory to $repo_dir"; exit 1; }
+        else
+            echo "Error: The directory '$repo_dir' was not found."
+            exit 1
+        fi
+        
+        # Checkout specific branch if provided
+        if [ -n "$fmbench_branch" ] && [ "$fmbench_branch" != "None" ]; then
+            git checkout $fmbench_branch
+        fi
+        
+        # Build fmbench and install
+        uv build
+        uv pip install -U dist/*.whl
+    else
+        echo "Error: fmbench_repo is not specified or is None"
+        exit 1
+    fi
 else
     # Install fmbench directly from pip
     uv pip install -U fmbench
