@@ -30,7 +30,8 @@ from fmbench_orchestrator.globals import (
     upload_and_run_script,
 )
 
-from fmbench_orchestrator.utils.yaml_utils import load_yaml_file
+from fmbench_orchestrator.schema.handler import ConfigHandler
+
 
 executor = ThreadPoolExecutor()
 
@@ -200,7 +201,7 @@ async def multi_deploy_fmbench(instance_details, remote_script_path):
     await asyncio.gather(*tasks)
 
 
-async def main():
+async def deploy_benchmarking():
     await multi_deploy_fmbench(instance_details, remote_script_path)
 
 
@@ -208,29 +209,24 @@ def cli_main():
     args = parse_args()
     logger.info(f"main, {args} = args")
 
-    globals.config_data = load_yaml_file(
-        args.config_file,
-        args.ami_mapping_file,
-        args.fmbench_config_file,
-        args.infra_config_file,
-        args.write_bucket,
+    config_handler = ConfigHandler.from_args(
+        config_file=args.config_file,
+        ami_mapping_file=args.ami_mapping_file,
+        fmbench_config_file=args.fmbench_config_file,
+        infra_config_file=args.infra_config_file,
+        write_bucket=args.write_bucket,
+    ).load_config()
+
+    logger.info(
+        f"Loaded Config {json.dumps(config_handler.config.model_dump(mode='json'), indent=2)}"
     )
-    logger.info(f"Loaded Config {json.dumps(globals.config_data, indent=2)}")
 
-    hf_token_fpath = globals.config_data["aws"].get("hf_token_fpath")
-    hf_token: Optional[str] = None
-    logger.info(f"Got Hugging Face Token file path from config. {hf_token_fpath}")
-    logger.info("Attempting to open it")
-
-    if Path(hf_token_fpath).is_file():
-        hf_token = Path(hf_token_fpath).read_text().strip()
-    else:
-        logger.error(f"{hf_token_fpath} does not exist, cannot continue")
+    try:
+        hf_token = config_handler.get_hf_token()
+        logger.info("Successfully loaded Hugging Face token")
+    except Exception as e:
+        logger.error(f"Failed to load Hugging Face token: {e}")
         sys.exit(1)
-    print("Breakpoint here")
-
-    logger.info(f"read hugging face token {hf_token} from file path")
-    assert len(hf_token) > 4, "Hf_token is too small or invalid, please check"
 
     for i in globals.config_data["instances"]:
         logger.info(f"Instance list is as follows: {i}")
@@ -416,7 +412,9 @@ def cli_main():
     time.sleep(sleep_time)
 
     instance_details = generate_instance_details(instance_id_list, instance_data_map)
-    asyncio.run(main())  # This is the correct way to run the async main
+    asyncio.run(
+        deploy_benchmarking(instance_details)
+    )  # This is the correct way to run the async main
     logger.info("all done")
 
 
