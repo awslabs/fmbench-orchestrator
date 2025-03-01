@@ -1,8 +1,8 @@
 """Command-line interface for FMBench orchestrator."""
 
 import argparse
-from src.utils.constants import INFRA_YML_FPATH
-from src.utils.logger import logger
+from fmbench_orchestrator.utils.constants import INFRA_YML_FPATH
+from fmbench_orchestrator.utils.logger import logger
 
 
 def parse_args() -> argparse.Namespace:
@@ -15,14 +15,14 @@ def parse_args() -> argparse.Namespace:
         type=str,
         help="Path to your Config File",
         required=False,
-        default="configs/config.yml",
+        default="fmbench_orchestrator/configs/config.yml",
     )
     parser.add_argument(
         "--ami-mapping-file",
         type=str,
         help="Path to a config file containing the region->instance type->AMI mapping",
         required=False,
-        default="configs/ami_mapping.yml",
+        default="fmbench_orchestrator/configs/ami_mapping.yml",
     )
     parser.add_argument(
         "--fmbench-config-file",

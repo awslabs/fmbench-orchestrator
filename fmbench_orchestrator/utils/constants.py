@@ -1,5 +1,7 @@
 from enum import Enum
 from typing import List
+# Infrastructure configuration paths
+INFRA_YML_FPATH: str = "fmbench_orchestrator/configs/infra.yml"
 
 # AWS Instance related constants
 DEFAULT_DEVICE_NAME: str = "/dev/sda1"

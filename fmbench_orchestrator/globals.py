@@ -1,17 +1,14 @@
 import os
 import json
 import boto3
-import logging
 import requests
 import paramiko
-from constants import *
+from fmbench_orchestrator.utils.constants import *
 from typing import Tuple
-from utils import authorize_inbound_rules, create_key_pair
+from fmbench_orchestrator.utils.main_utils import authorize_inbound_rules, create_key_pair
 from botocore.exceptions import NoCredentialsError, ClientError
-from utils import create_security_group, load_yaml_file, _get_ec2_hostname_and_username, get_region
-
-# set a logger
-logger = logging.getLogger(__name__)
+from fmbench_orchestrator.utils.main_utils import create_security_group, _get_ec2_hostname_and_username
+from fmbench_orchestrator.utils.logger import logger
 
 config_data = {}
 

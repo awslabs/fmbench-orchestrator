@@ -1,5 +1,12 @@
+[build-system]
+requires = [
+    "setuptools>=61.0.0",  # This version supports newer metadata
+    "wheel",
+]
+build-backend = "setuptools.build_meta"
+
 [project]
-name = "fmbench-orchestrator"
+name = "fmbench_orchestrator"
 version = "0.1.0"
 description = "Automates LLM benchmarking with fmbench"
 readme = "README.md"
@@ -20,4 +27,18 @@ dependencies = [
     "tomark==0.1.4",
     "wget==3.2",
     "zmq>=0.0.0",
+    "pydantic>=2.0",
 ]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "black>=23.0",
+    "isort>=5.0",
+]
+
+[tool.setuptools]
+packages = ["fmbench_orchestrator"]
+
+[project.scripts]
+fmbench_orchestrator = "fmbench_orchestrator.main:cli_main"

@@ -1,0 +1,424 @@
+import os
+import sys
+import time
+import json
+import wget
+import yaml
+import boto3
+import base64
+import urllib
+import logging
+import asyncio
+import argparse
+import paramiko
+from fmbench_orchestrator.utils import *
+from fmbench_orchestrator.utils.constants import *
+import fmbench_orchestrator.globals as globals
+from pathlib import Path
+from scp import SCPClient
+from typing import Optional, List, Dict
+from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
+from botocore.exceptions import NoCredentialsError, ClientError
+from fmbench_orchestrator.cli import parse_args
+from fmbench_orchestrator.utils.logger import logger
+from fmbench_orchestrator.globals import (
+    create_iam_instance_profile_arn,
+    get_iam_role,
+    get_sg_id,
+    get_key_pair,
+    upload_and_run_script,
+)
+
+from fmbench_orchestrator.utils.yaml_utils import load_yaml_file
+
+executor = ThreadPoolExecutor()
+
+# Initialize global variables for this file
+instance_id_list: List = []
+fmbench_config_map: List = []
+fmbench_post_startup_script_map: List = []
+instance_data_map: Dict = {}
+
+
+async def execute_fmbench(instance, post_install_script, remote_script_path):
+    """
+    Asynchronous wrapper for deploying an instance using synchronous functions.
+    """
+    # Check for the startup completion flag
+    startup_complete = await asyncio.get_event_loop().run_in_executor(
+        executor,
+        wait_for_flag,
+        instance,
+        STARTUP_COMPLETE_FLAG_FPATH,
+        CLOUD_INITLOG_PATH,
+    )
+
+    if startup_complete:
+        if instance["upload_files"]:
+            await upload_file_to_instance_async(
+                instance["hostname"],
+                instance["username"],
+                instance["key_file_path"],
+                file_paths=instance["upload_files"],
+            )
+        num_configs: int = len(instance["config_file"])
+        for cfg_idx, config_file in enumerate(instance["config_file"]):
+            cfg_idx += 1
+            instance_name = instance["instance_name"]
+            local_mode_param = POST_STARTUP_LOCAL_MODE_VAR
+            write_bucket_param = POST_STARTUP_WRITE_BUCKET_VAR
+            # If a user has provided the additional generatic command line arguments, those will
+            # be used in the fmbench --config-file command. Such as the model id, the instance type,
+            # the serving properties, etc.
+            additional_args = ""
+
+            logger.info(
+                f"going to run config {cfg_idx} of {num_configs} for instance {instance_name}"
+            )
+            # Handle configuration file (download/upload) and get the remote path
+            remote_config_path = await handle_config_file_async(instance, config_file)
+            # Format the script with the remote config file path
+            # Change this later to be a better implementation, right now it is bad.
+
+            # override defaults for post install script params if specified
+            pssp = instance.get("post_startup_script_params")
+            logger.info(f"User provided post start up script parameters: {pssp}")
+            if pssp is not None:
+                local_mode_param = pssp.get("local_mode", local_mode_param)
+                write_bucket_param = pssp.get("write_bucket", write_bucket_param)
+                additional_args = pssp.get("additional_args", additional_args)
+            logger.info(
+                f"Going to use the additional arguments in the command line: {additional_args}"
+            )
+
+            # Convert `local_mode_param` to "yes" or "no" if it is a boolean
+            if isinstance(local_mode_param, bool):
+                local_mode_param = "yes" if local_mode_param else "no"
+
+            formatted_script = (
+                Path(post_install_script)
+                .read_text()
+                .format(
+                    config_file=remote_config_path,
+                    local_mode=local_mode_param,
+                    write_bucket=write_bucket_param,
+                    additional_args=additional_args,
+                )
+            )
+            logger.info(f"Formatted post startup script: {formatted_script}")
+
+            # Upload and execute the script on the instance
+            retries = 0
+            max_retries = 2
+            retry_sleep = 60
+            while True:
+                logger.info("Startup Script complete, executing fmbench now")
+                script_output = await asyncio.get_event_loop().run_in_executor(
+                    executor,
+                    upload_and_execute_script_invoke_shell,
+                    instance["hostname"],
+                    instance["username"],
+                    instance["key_file_path"],
+                    formatted_script,
+                    remote_script_path,
+                )
+                logger.info(
+                    f"Script Output from {instance['hostname']}:\n{script_output}"
+                )
+                if script_output != "":
+                    break
+                else:
+                    logger.error(f"post startup script not successfull after {retries}")
+                    if retries < max_retries:
+                        logger.error(
+                            f"post startup script retries={retries}, trying after a {retry_sleep}s sleep"
+                        )
+                    else:
+                        logger.error(
+                            f"post startup script retries={retries}, not retrying any more, benchmarking "
+                            f"for instance={instance} will fail...."
+                        )
+                        break
+                time.sleep(retry_sleep)
+                retries += 1
+
+            # Check for the fmbench completion flag
+            fmbench_complete = await asyncio.get_event_loop().run_in_executor(
+                executor,
+                wait_for_flag,
+                instance,
+                FMBENCH_TEST_COMPLETE_FLAG_FPATH,
+                FMBENCH_LOG_PATH,
+                instance["fmbench_complete_timeout"],
+                SCRIPT_CHECK_INTERVAL_IN_SECONDS,
+            )
+
+            logger.info("Going to get fmbench.log from the instance now")
+            results_folder = os.path.join(
+                RESULTS_DIR, globals.config_data["general"]["name"]
+            )
+            # Get Log even if fmbench_completes or not
+            await asyncio.get_event_loop().run_in_executor(
+                executor,
+                get_fmbench_log,
+                instance,
+                results_folder,
+                FMBENCH_LOG_REMOTE_PATH,
+                cfg_idx,
+            )
+
+            if fmbench_complete:
+                logger.info("Fmbench Run successful, Getting the folders now")
+                await asyncio.get_event_loop().run_in_executor(
+                    executor,
+                    check_and_retrieve_results_folder,
+                    instance,
+                    results_folder,
+                )
+        if globals.config_data["run_steps"]["delete_ec2_instance"]:
+            delete_ec2_instance(instance["instance_id"], instance["region"])
+            instance_id_list.remove(instance["instance_id"])
+
+
+async def multi_deploy_fmbench(instance_details, remote_script_path):
+    tasks = []
+
+    # Create a task for each instance
+    for instance in instance_details:
+        # Make this async as well?
+        # Format the script with the specific config file
+        logger.info(f"Instance Details are: {instance}")
+        # Create an async task for this instance
+        tasks.append(
+            execute_fmbench(
+                instance, instance["post_startup_script"], remote_script_path
+            )
+        )
+
+    # Run all tasks concurrently
+    await asyncio.gather(*tasks)
+
+
+async def main():
+    await multi_deploy_fmbench(instance_details, remote_script_path)
+
+
+def cli_main():
+    args = parse_args()
+    logger.info(f"main, {args} = args")
+
+    globals.config_data = load_yaml_file(
+        args.config_file,
+        args.ami_mapping_file,
+        args.fmbench_config_file,
+        args.infra_config_file,
+        args.write_bucket,
+    )
+    logger.info(f"Loaded Config {json.dumps(globals.config_data, indent=2)}")
+
+    hf_token_fpath = globals.config_data["aws"].get("hf_token_fpath")
+    hf_token: Optional[str] = None
+    logger.info(f"Got Hugging Face Token file path from config. {hf_token_fpath}")
+    logger.info("Attempting to open it")
+
+    if Path(hf_token_fpath).is_file():
+        hf_token = Path(hf_token_fpath).read_text().strip()
+    else:
+        logger.error(f"{hf_token_fpath} does not exist, cannot continue")
+        sys.exit(1)
+    print("Breakpoint here")
+
+    logger.info(f"read hugging face token {hf_token} from file path")
+    assert len(hf_token) > 4, "Hf_token is too small or invalid, please check"
+
+    for i in globals.config_data["instances"]:
+        logger.info(f"Instance list is as follows: {i}")
+
+    logger.info(f"Deploying Ec2 Instances")
+    if globals.config_data["run_steps"]["deploy_ec2_instance"]:
+        try:
+            iam_arn = get_iam_role()
+        except Exception as e:
+            logger.error(f"Cannot get IAM Role due to exception {e}")
+
+        if not iam_arn:
+            raise NoCredentialsError(
+                """Unable to locate credentials,
+                                        Please check if an IAM role is 
+                                        attched to your instance."""
+            )
+
+        logger.info(f"iam arn: {iam_arn}")
+        # WIP Parallelize This.
+        num_instances: int = len(globals.config_data["instances"])
+        for idx, instance in enumerate(globals.config_data["instances"]):
+            idx += 1
+            logger.info(
+                f"going to create instance {idx} of {num_instances}, instance={instance}"
+            )
+            deploy: bool = instance.get("deploy", True)
+            if deploy is False:
+                logger.warning(
+                    f"deploy={deploy} for instance={json.dumps(instance, indent=2)}, skipping it..."
+                )
+                continue
+            region = instance.get("region", globals.config_data["aws"].get("region"))
+            startup_script = instance["startup_script"]
+            logger.info(f"Region Set for instance is: {region}")
+            if globals.config_data["run_steps"]["security_group_creation"]:
+                logger.info(
+                    f"Creating Security Groups. getting them by name if they exist"
+                )
+                sg_id = get_sg_id(region)
+            if region is not None:
+                PRIVATE_KEY_FNAME, PRIVATE_KEY_NAME = get_key_pair(region)
+            else:
+                logger.error(
+                    f"Region is not provided in the configuration file. Make sure the region exists. Region: {region}"
+                )
+            # command_to_run = instance["command_to_run"]
+            with open(f"{startup_script}", "r") as file:
+                user_data_script = file.read()
+                # Replace the hf token in the bash script to pull the HF model
+                user_data_script = user_data_script.replace("__HF_TOKEN__", hf_token)
+                user_data_script = user_data_script.replace("__neuron__", "True")
+                logger.info(
+                    f"FMBench latest is set to {args.fmbench_latest}, fmbench_repo={args.fmbench_repo}"
+                )
+                if args.fmbench_latest is True and args.fmbench_repo is None:
+                    # you do not want to download FMBench from Pip but dont have a specific fork that you want
+                    # to use for FMBench so we will default to https://github.com/aws-samples/foundation-model-benchmarking-tool
+                    args.fmbench_repo = FMBENCH_GH_REPO
+                    logger.info(
+                        f"FMBench latest is set to {args.fmbench_latest}, fmbench_repo is now set to {args.fmbench_repo}"
+                    )
+                elif args.fmbench_repo is not None:
+                    # you want to use a custom repo but did not set the fmbench_latest flag, that is fine, we will set it here
+                    args.fmbench_latest = True
+                    logger.info(
+                        f"FMBench latest is now set to {args.fmbench_latest}, fmbench_repo is set to {args.fmbench_repo}"
+                    )
+
+                user_data_script = user_data_script.replace(
+                    "__fmbench_latest__", str(args.fmbench_latest)
+                )
+                user_data_script = user_data_script.replace(
+                    "__fmbench_repo__", str(args.fmbench_repo)
+                )
+                logger.info(f"User data script: {user_data_script}")
+
+            if instance.get("instance_id") is None:
+                instance_type = instance["instance_type"]
+                ami_id = instance["ami_id"]
+                device_name = instance["device_name"]
+                ebs_del_on_termination = instance["ebs_del_on_termination"]
+                ebs_Iops = instance["ebs_Iops"]
+                ebs_VolumeSize = instance["ebs_VolumeSize"]
+                ebs_VolumeType = instance["ebs_VolumeType"]
+                # Retrieve CapacityReservationId and CapacityReservationResourceGroupArn if they exist
+                CapacityReservationId = instance.get("CapacityReservationId", None)
+                CapacityReservationPreference = instance.get(
+                    "CapacityReservationPreference", "none"
+                )
+                CapacityReservationResourceGroupArn = instance.get(
+                    "CapacityReservationResourceGroupArn", None
+                )
+
+                if CapacityReservationId:
+                    logger.info(
+                        f"Capacity reservation id provided: {CapacityReservationId}"
+                    )
+                elif CapacityReservationResourceGroupArn:
+                    logger.info(
+                        f"Capacity reservation resource group ARN provided: {CapacityReservationResourceGroupArn}"
+                    )
+                else:
+                    logger.info(
+                        "No capacity reservation specified, using default preference"
+                    )
+
+                # Create an EC2 instance with the user data script
+                instance_id = create_ec2_instance(
+                    idx,
+                    PRIVATE_KEY_NAME,
+                    sg_id,
+                    user_data_script,
+                    ami_id,
+                    instance_type,
+                    iam_arn,
+                    region,
+                    device_name,
+                    ebs_del_on_termination,
+                    ebs_Iops,
+                    ebs_VolumeSize,
+                    ebs_VolumeType,
+                    CapacityReservationPreference,
+                    CapacityReservationId,
+                    CapacityReservationResourceGroupArn,
+                )
+                instance_id_list.append(instance_id)
+                instance_data_map[instance_id] = {
+                    "fmbench_config": instance["fmbench_config"],
+                    "post_startup_script": instance["post_startup_script"],
+                    "post_startup_script_params": instance.get(
+                        "post_startup_script_params"
+                    ),
+                    "fmbench_complete_timeout": instance["fmbench_complete_timeout"],
+                    "region": instance.get("region", region),
+                    "PRIVATE_KEY_FNAME": PRIVATE_KEY_FNAME,
+                    "upload_files": instance.get("upload_files"),
+                }
+            else:
+                instance_id = instance["instance_id"]
+                # TODO: Check if host machine can open the private key provided, if it cant, raise exception
+                PRIVATE_KEY_FNAME = instance["private_key_fname"]
+                if not PRIVATE_KEY_FNAME:
+                    logger.error(
+                        "Private key not found, not adding instance to instance id list"
+                    )
+                if upload_and_run_script(
+                    instance_id,
+                    PRIVATE_KEY_FNAME,
+                    user_data_script,
+                    instance["region"],
+                    instance["startup_script"],
+                ):
+                    logger.info(
+                        f"Startup script uploaded and executed on instance {instance_id}"
+                    )
+                else:
+                    logger.error(
+                        f"Failed to upload and execute startup script on instance {instance_id}"
+                    )
+                if PRIVATE_KEY_FNAME:
+                    instance_id_list.append(instance_id)
+                    instance_data_map[instance_id] = {
+                        "fmbench_config": instance["fmbench_config"],
+                        "post_startup_script": instance["post_startup_script"],
+                        "fmbench_complete_timeout": instance[
+                            "fmbench_complete_timeout"
+                        ],
+                        "post_startup_script_params": instance.get(
+                            "post_startup_script_params"
+                        ),
+                        "region": instance.get("region", region),
+                        "PRIVATE_KEY_FNAME": PRIVATE_KEY_FNAME,
+                        "upload_files": instance.get("upload_files"),
+                    }
+
+                logger.info(f"done creating instance {idx} of {num_instances}")
+
+    sleep_time = 60
+    logger.info(
+        f"Going to Sleep for {sleep_time} seconds to make sure the instances are up"
+    )
+    time.sleep(sleep_time)
+
+    instance_details = generate_instance_details(instance_id_list, instance_data_map)
+    asyncio.run(main())  # This is the correct way to run the async main
+    logger.info("all done")
+
+
+if __name__ == "__main__":
+    cli_main()
