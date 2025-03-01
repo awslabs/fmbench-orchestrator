@@ -170,3 +170,26 @@ class MainConfig(BaseModel):
 
         validate_assignment = True
         extra = "forbid"
+
+
+class InstanceDetails(BaseModel):
+    """Model for tracking instance details during deployment"""
+
+    instance_id: str
+    fmbench_config: List[str]
+    post_startup_script: str
+    post_startup_script_params: Optional[Dict] = None
+    fmbench_complete_timeout: int
+    region: str
+    key_file_path: str = Field(alias="PRIVATE_KEY_FNAME")  # Maps to PRIVATE_KEY_FNAME
+    upload_files: Optional[List[UploadFile]] = None
+    hostname: Optional[str] = None
+    username: Optional[str] = "ubuntu"  # Default username for AWS instances
+    instance_name: Optional[str] = None
+
+    class Config:
+        """Pydantic config"""
+
+        validate_assignment = True
+        extra = "forbid"
+        populate_by_name = True  # Allows both PRIVATE_KEY_FNAME and key_file_path
