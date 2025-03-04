@@ -16,3 +16,15 @@ configs/fmbench/*
 results/
 analytics/__pycache__
 analytics/results
+fmbench_orchestrator.egg-info/
+fmbench_orchestrator/aws/__pycache__
+fmbench_orchestrator/schema/__pycache__
+fmbench_orchestrator/utils/__pycache__
+fmbench_orchestrator/globals/__pycache__
+fmbench_orchestrator/schema/__pycache__
+fmbench_orchestrator/aws/__pycache__
+fmbench_orchestrator/schema/__pycache__
+fmbench_orchestrator/utils/__pycache__
+fmbench_orchestrator/globals/__pycache__
+fmbench_orchestrator/schema/__pycache__
+
