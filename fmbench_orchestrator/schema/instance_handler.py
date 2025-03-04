@@ -1,4 +1,4 @@
-"""Instance management module for fmbench-orchestrator."""
+ """Instance management module for fmbench-orchestrator."""
 
 import time
 import json
@@ -14,21 +14,29 @@ from fmbench_orchestrator.globals import (
     FMBENCH_GH_REPO,
 )
 from fmbench_orchestrator.schema.handler import ConfigHandler
+from fmbench_orchestrator.schema.models import InstanceDetails
+from pydantic import BaseModel
 
 
-class InstanceHandler:
+class InstanceHandler(BaseModel):
     """Handler for managing EC2 instances"""
 
-    def __init__(self, config_handler: ConfigHandler):
-        self.config_handler = config_handler
-        self.instance_id_list: List[str] = []
-        self.instance_data_map: Dict[str, Dict] = {}
+    config_handler: ConfigHandler
+    instance_id_list: List[str] = []
+    instance_details_map: Dict[str, InstanceDetails] = {}
+
+    class Config:
+        """Pydantic config"""
+
+        arbitrary_types_allowed = True
 
     def deploy_instances(self, args) -> Tuple[List[str], Dict[str, Dict]]:
         """Deploy EC2 instances based on configuration"""
         logger.info("Deploying EC2 Instances")
         if not self.config_handler.run_steps.deploy_ec2_instance:
-            return self.instance_id_list, self.instance_data_map
+            return self.instance_id_list, {
+                k: v.model_dump() for k, v in self.instance_details_map.items()
+            }
 
         try:
             iam_arn = get_iam_role()
@@ -57,7 +65,9 @@ class InstanceHandler:
 
             self._deploy_single_instance(instance, idx, iam_arn, args)
 
-        return self.instance_id_list, self.instance_data_map
+        return self.instance_id_list, {
+            k: v.model_dump() for k, v in self.instance_details_map.items()
+        }
 
     def _deploy_single_instance(self, instance, idx: int, iam_arn: str, args):
         """Deploy a single EC2 instance"""
@@ -194,15 +204,18 @@ class InstanceHandler:
     ):
         """Add instance details to tracking maps"""
         self.instance_id_list.append(instance_id)
-        self.instance_data_map[instance_id] = {
-            "fmbench_config": instance.fmbench_config,
-            "post_startup_script": instance.post_startup_script,
-            "post_startup_script_params": instance.post_startup_script_params,
-            "fmbench_complete_timeout": instance.fmbench_complete_timeout,
-            "region": region,
-            "PRIVATE_KEY_FNAME": private_key_fname,
-            "upload_files": instance.upload_files,
-        }
+        instance_details = InstanceDetails(
+            instance_id=instance_id,
+            fmbench_config=instance.fmbench_config,
+            post_startup_script=instance.post_startup_script,
+            post_startup_script_params=instance.post_startup_script_params,
+            fmbench_complete_timeout=instance.fmbench_complete_timeout,
+            region=region,
+            PRIVATE_KEY_FNAME=private_key_fname,
+            upload_files=instance.upload_files,
+            instance_name=f"instance_{instance_id}",  # Generate a default instance name
+        )
+        self.instance_details_map[instance_id] = instance_details
 
     def wait_for_instances(self, sleep_time: int = 60):
         """Wait for instances to be ready"""
