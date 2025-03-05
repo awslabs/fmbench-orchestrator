@@ -1,2 +1,0 @@
-[console_scripts]
-fmbench_orchestrator = fmbench_orchestrator.main:cli_main

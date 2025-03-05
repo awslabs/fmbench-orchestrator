@@ -1,12 +1,16 @@
 """YAML utilities for configuration handling."""
 import re
 import yaml
+import os
+import logging
+import urllib.parse
+import urllib.request
 from pathlib import Path
 from jinja2 import Template
 from typing import Dict, Any, Optional
 from fmbench_orchestrator.utils.logger import logger    
 from fmbench_orchestrator.utils.aws_utils import get_region
-from fmbench_orchestrator.utils.constants import FMBENCH_CFG_PREFIX, FMBENCH_CFG_GH_PREFIX
+from fmbench_orchestrator.utils.constants import CONSTANTS
 
 
 def _normalize_yaml_param_spacing(template_content: str, variable_name: str) -> str:
@@ -154,8 +158,8 @@ def load_yaml_file(config_file_path: str,
                     raise Exception(f"instance {i+1}, instance_type={instance['instance_type']}, "
                                     f"no fmbench_config file provided, cannot continue")
 
-                if fmbench_config_paths[j].startswith(FMBENCH_CFG_PREFIX):
-                    fmbench_config_paths[j] = fmbench_config_paths[j].replace(FMBENCH_CFG_PREFIX, FMBENCH_CFG_GH_PREFIX)
+                if fmbench_config_paths[j].startswith(CONSTANTS.FMBENCH_CFG_PREFIX):
+                    fmbench_config_paths[j] = fmbench_config_paths[j].replace(CONSTANTS.FMBENCH_CFG_PREFIX, CONSTANTS.FMBENCH_CFG_GH_PREFIX)
             config_data['instances'][i]['fmbench_config'] = fmbench_config_paths
 
     return config_data

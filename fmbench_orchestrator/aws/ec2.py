@@ -1,12 +1,8 @@
 import boto3
-from typing import Optional, Dict
+import logging
+from typing import Dict, Any
 from fmbench_orchestrator.utils.logger import logger
-from fmbench_orchestrator.utils.constants import (
-    DEFAULT_DEVICE_NAME,
-    EBS_IOPS,
-    EBS_VOLUME_SIZE,
-    EBS_VOLUME_TYPE,
-)
+from fmbench_orchestrator.utils.constants import CONSTANTS, AMIType
 
 
 def create_ec2_instance(

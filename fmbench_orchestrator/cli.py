@@ -1,7 +1,8 @@
 """Command-line interface for FMBench orchestrator."""
 
 import argparse
-from fmbench_orchestrator.utils.constants import INFRA_YML_FPATH
+import logging
+from fmbench_orchestrator.utils.constants import CONSTANTS
 from fmbench_orchestrator.utils.logger import logger
 
 
@@ -33,9 +34,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--infra-config-file",
         type=str,
-        default=INFRA_YML_FPATH,
-        help=f"Config file to use with AWS infrastructure, default={INFRA_YML_FPATH}",
-        required=False,
+        help="Path to the infrastructure config file",
+        default=CONSTANTS.INFRA_YML_FPATH,
     )
     parser.add_argument(
         "--write-bucket",

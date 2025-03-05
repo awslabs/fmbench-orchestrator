@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import List
+
 # Infrastructure configuration paths
 INFRA_YML_FPATH: str = "fmbench_orchestrator/configs/infra.yml"
 
@@ -17,12 +18,10 @@ IS_NEURON_INSTANCE = lambda instance_type: any(
     [instance_type.startswith(p) for p in AWS_CHIPS_PREFIX_LIST]
 )
 
-
 class AMIType(str, Enum):
     NEURON = "neuron"
     GPU = "gpu"
     CPU = "cpu"
-
 
 # Flag and monitoring constants
 STARTUP_COMPLETE_FLAG_FPATH: str = "/tmp/startup_complete.flag"
