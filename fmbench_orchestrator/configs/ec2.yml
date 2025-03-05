@@ -52,13 +52,13 @@ defaults: &ec2_settings
   fmbench_complete_timeout: 2400
 
 instances:
-- instance_type: g6e.2xlarge
+- instance_type: t3.medium
   <<: *ec2_settings    
   fmbench_config: 
   - fmbench:llama3/8b/config-ec2-llama3-8b-g6e-2xlarge.yml
 
-- instance_type: g6e.4xlarge
-  <<: *ec2_settings
-  fmbench_config: 
-  - fmbench:llama3/8b/config-llama3-8b-g6e.4xl-tp-1-mc-max-djl-ec2.yml
+# - instance_type: g6e.4xlarge
+#   <<: *ec2_settings
+#   fmbench_config: 
+#   - fmbench:llama3/8b/config-llama3-8b-g6e.4xl-tp-1-mc-max-djl-ec2.yml
 

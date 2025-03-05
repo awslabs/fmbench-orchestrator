@@ -1,19 +1,127 @@
 import os
-import json
 import boto3
-import logging
 import requests
-import paramiko
-from constants import *
-from typing import Tuple
-from utils import authorize_inbound_rules, create_key_pair
-from botocore.exceptions import NoCredentialsError, ClientError
-from utils import create_security_group, load_yaml_file, _get_ec2_hostname_and_username, get_region
+from typing import Tuple, Optional
+from fmbench_orchestrator.utils.logger import logger
+from fmbench_orchestrator.utils.constants import CONSTANTS
+from fmbench_orchestrator.aws.key_pair import create_key_pair
+from botocore.exceptions import ClientError, NoCredentialsError 
+from fmbench_orchestrator.aws.security_group import authorize_inbound_rules, create_security_group
 
-# set a logger
-logger = logging.getLogger(__name__)
 
-config_data = {}
+
+def get_region() -> str:
+    """
+    This function fetches the current region where this orchestrator is running using the 
+    EC2 region metadata API or the boto3 session if the region cannot be determined from
+    the API.
+    """
+    try:
+        session = boto3.session.Session()
+        region_name = session.region_name
+        if region_name is None:
+            logger.info(
+                f"boto3.session.Session().region_name is {region_name}, "
+                f"going to use an metadata api to determine region name"
+            )
+            # THIS CODE ASSUMED WE ARE RUNNING ON EC2, for everything else
+            # the boto3 session should be sufficient to retrieve region name
+            resp = requests.put(
+                "http://169.254.169.254/latest/api/token",
+                headers={"X-aws-ec2-metadata-token-ttl-seconds": "21600"},
+            )
+            token = resp.text
+            region_name = requests.get(
+                "http://169.254.169.254/latest/meta-data/placement/region",
+                headers={"X-aws-ec2-metadata-token": token},
+            ).text
+            logger.info(
+                f"region_name={region_name}, also setting the AWS_DEFAULT_REGION env var"
+            )
+            os.environ["AWS_DEFAULT_REGION"] = region_name
+        logger.info(f"region_name={region_name}")
+    except Exception as e:
+        logger.error(f"Could not fetch the region: {e}")
+        region_name = None
+    return region_name
+
+def _determine_username(ami_id: str, region: str):
+    """
+    Determine the appropriate username based on the AMI ID or name.
+
+    Args:
+        ami_id (str): The ID of the AMI used to launch the EC2 instance.
+
+    Returns:
+        str: The username for the EC2 instance.
+    """
+    try:
+        ec2_client = boto3.client("ec2", region)
+        # Describe the AMI to get its name
+        response = ec2_client.describe_images(ImageIds=[ami_id])
+        ec2_username: Optional[str] = None
+        if response is not None:
+            ami_name = response["Images"][0][
+                "Name"
+            ].lower()  # Convert AMI name to lowercase
+        else:
+            logger.error(f"Could not describe the ec2 image")
+            return
+        # Match the AMI name to determine the username
+        for key in AMI_USERNAME_MAP:
+            if key in ami_name:
+                return AMI_USERNAME_MAP[key]
+
+        # Default username if no match is found
+        ec2_username = DEFAULT_EC2_USERNAME
+    except Exception as e:
+        logger.info(f"Error fetching AMI details: {e}")
+        ec2_username = DEFAULT_EC2_USERNAME
+    return ec2_username
+
+def _get_ec2_hostname_and_username(
+    instance_id: str, region: str, public_dns=True
+) -> Tuple:
+    """
+    Retrieve the public or private DNS name (hostname) and username of an EC2 instance.
+    Args:
+        instance_id (str): The ID of the EC2 instance.
+        region (str): The AWS region where the instance is located.
+        public_dns (bool): If True, returns the public DNS; if False, returns the private DNS.
+
+    Returns:
+        tuple: A tuple containing the hostname (public or private DNS) and username.
+    """
+    try:
+        hostname, username, instance_name = None, None, None
+        ec2_client = boto3.client("ec2", region_name=region)
+        # Describe the instance
+        response = ec2_client.describe_instances(InstanceIds=[instance_id])
+        if response is not None:
+            # Extract instance information
+            instance = response["Reservations"][0]["Instances"][0]
+            ami_id = instance.get(
+                "ImageId"
+            )  # Get the AMI ID used to launch the instance
+            # Check if the public DNS or private DNS is required
+            if public_dns:
+                hostname = instance.get("PublicDnsName")
+            else:
+                hostname = instance.get("PrivateDnsName")
+            # instance name
+            tags = response["Reservations"][0]["Instances"][0]["Tags"]
+            logger.info(f"tags={tags}")
+            instance_names = [t["Value"] for t in tags if t["Key"] == "Name"]
+            if not instance_names:
+                instance_name = "FMBench-" + instance.get('InstanceType') + "-" + instance_id
+            else:
+                instance_name = instance_names[0]
+        # Determine the username based on the AMI ID
+        username = _determine_username(ami_id, region)
+    except Exception as e:
+        logger.info(f"Error fetching instance details (hostname and username): {e}")
+    return hostname, username, instance_name
+
 
 def get_iam_role() -> str:
     try:
@@ -252,83 +360,3 @@ def upload_and_run_script(
     return has_start_up_script_executed
 
 
-def get_sg_id(region: str) -> str:
-    # Append the region to the group name
-    GROUP_NAME = f"{config_data['security_group'].get('group_name')}-{region}"
-    DESCRIPTION = config_data["security_group"].get("description", " ")
-    VPC_ID = config_data["security_group"].get("vpc_id")
-
-    try:
-        # Create or get the security group with the region-specific name
-        sg_id = create_security_group(region, GROUP_NAME, DESCRIPTION, VPC_ID)
-        logger.info(f"Security group '{GROUP_NAME}' created or imported in {region}")
-
-        if sg_id:
-            # Add inbound rules if security group was created or imported successfully
-            authorize_inbound_rules(sg_id, region)
-            logger.info(f"Inbound rules added to security group '{GROUP_NAME}'")
-
-        return sg_id
-
-    except ClientError as e:
-        logger.error(
-            f"An error occurred while creating or getting the security group '{GROUP_NAME}': {e}"
-        )
-        raise  # Re-raise the exception for further handling if needed
-
-
-def get_key_pair(region):
-    # Create 'key_pair' directory if it doesn't exist
-    key_pair_dir = "key_pair"
-    if not os.path.exists(key_pair_dir):
-        os.makedirs(key_pair_dir)
-
-    # Generate the key pair name using the format: config_name-region
-    key_pair_name_configured = config_data["key_pair_gen"]["key_pair_name"]
-
-    # Generate the key pair name using the format: config_name-region
-    key_pair_name = f"{key_pair_name_configured}_{region}"
-    logger.info(f"key_pair_name_configured={key_pair_name_configured}, setting the key pair name as={key_pair_name}")
-    private_key_fname = os.path.join(key_pair_dir, f"{key_pair_name}.pem")
-
-    # Check if key pair generation is enabled
-    if config_data["run_steps"]["key_pair_generation"]:
-        # First, check if the key pair file already exists
-        if os.path.exists(private_key_fname):
-            try:
-                # If the key pair file exists, read it
-                with open(private_key_fname, "r") as file:
-                    private_key = file.read()
-                print(f"Using existing key pair from {private_key_fname}")
-            except IOError as e:
-                raise ValueError(
-                    f"Error reading existing key pair file '{private_key_fname}': {e}"
-                )
-        else:
-            # If the key pair file doesn't exist, create a new key pair
-            try:
-                delete_key_pair_if_present: bool = True
-                private_key = create_key_pair(key_pair_name, region, delete_key_pair_if_present)
-                # Save the key pair to the file
-                with open(private_key_fname, "w") as key_file:
-                    key_file.write(private_key)
-
-                # Set file permissions to be readable only by the owner
-                os.chmod(private_key_fname, 0o400)
-                print(
-                    f"Key pair '{key_pair_name}' created and saved as '{private_key_fname}'"
-                )
-            except Exception as e:
-                # If key pair creation fails, raise an error
-                raise ValueError(f"Failed to create key pair '{key_pair_name}': {e}")
-    else:
-        # If key pair generation is disabled, attempt to use an existing key
-        try:
-            with open(private_key_fname, "r") as file:
-                private_key = file.read()
-            print(f"Using pre-existing key pair from {private_key_fname}")
-        except FileNotFoundError:
-            raise ValueError(f"Key pair file not found at {private_key_fname}")
-        except IOError as e:
-            raise ValueError(f"Error reading key pair file '{private_key_fname}': {e}")
-    return private_key_fname, key_pair_name
