@@ -5,12 +5,11 @@ import logging
 import asyncio
 import argparse
 from fmbench_orchestrator.utils import *
-from fmbench_orchestrator.utils.constants import CONSTANTS
-import fmbench_orchestrator.globals as globals
+from fmbench_orchestrator.utils.constants import *
 from fmbench_orchestrator.cli import parse_args
 from fmbench_orchestrator.utils.logger import logger
 from fmbench_orchestrator.schema.handler import ConfigHandler
-from fmbench_orchestrator.instance_handler import InstanceHandler
+from fmbench_orchestrator.schema.instance_handler import InstanceHandler
 from fmbench_orchestrator.core import BenchmarkRunner
 
 async def deploy_benchmarking(instance_details, remote_script_path):
@@ -36,19 +35,12 @@ def cli_main():
         f"Loaded Config {json.dumps(config_handler.config.model_dump(mode='json'), indent=2)}"
     )
 
-    try:
-        hf_token = config_handler.get_hf_token()
-        logger.info("Successfully loaded Hugging Face token")
-    except Exception as e:
-        logger.error(f"Failed to load Hugging Face token: {e}")
-        sys.exit(1)
-
     for instance in config_handler.instances:
         logger.info(f"Instance list is as follows: {instance.model_dump(mode='json')}")
 
     # Initialize and use the InstanceHandler
     instance_handler = InstanceHandler(config_handler=config_handler)
-    instance_id_list, instance_data_map = instance_handler.deploy_instances(args)
+    instance_handler.deploy_instances(args)
     instance_handler.wait_for_instances()
 
     # Generate instance details from the Pydantic models
@@ -56,10 +48,10 @@ def cli_main():
         details.model_dump()
         for details in instance_handler.instance_details_map.values()
     ]
-
+    # Runs fmbench on the instances in parallel
     asyncio.run(
         deploy_benchmarking(instance_details, config_handler)
-    )  # This is the correct way to run the async main
+    )
     logger.info("all done")
 
 if __name__ == "__main__":

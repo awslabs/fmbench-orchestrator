@@ -23,7 +23,7 @@ from fmbench_orchestrator.utils.logger import logger
 
 executor = ThreadPoolExecutor()
 
-def _get_latest_version(package_name: str) -> Optional[str]:
+def get_latest_version(package_name: str = "fmbench") -> Optional[str]:
     url = f"https://pypi.org/pypi/{package_name}/json"
     response = requests.get(url)
     

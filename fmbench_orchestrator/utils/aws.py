@@ -3,7 +3,7 @@ import boto3
 import requests
 from typing import Tuple, Optional
 from fmbench_orchestrator.utils.logger import logger
-from fmbench_orchestrator.utils.constants import CONSTANTS
+from fmbench_orchestrator.utils.constants import *
 from fmbench_orchestrator.aws.key_pair import create_key_pair
 from botocore.exceptions import ClientError, NoCredentialsError 
 from fmbench_orchestrator.aws.security_group import authorize_inbound_rules, create_security_group

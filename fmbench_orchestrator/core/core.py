@@ -5,7 +5,7 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict
 from fmbench_orchestrator.utils.logger import logger
-from fmbench_orchestrator.utils.constants import CONSTANTS
+from fmbench_orchestrator.utils.constants import *
 from fmbench_orchestrator.utils.main_utils import (
     wait_for_flag,
     upload_file_to_instance_async,
@@ -14,8 +14,7 @@ from fmbench_orchestrator.utils.main_utils import (
     get_fmbench_log,
     check_and_retrieve_results_folder,
 )
-import fmbench_orchestrator.globals as globals
-from fmbench_orchestrator.instance_handler import delete_ec2_instance
+from fmbench_orchestrator.aws.ec2 import delete_ec2_instance
 
 class BenchmarkRunner:
     def __init__(self):

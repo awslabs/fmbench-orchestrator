@@ -3,9 +3,7 @@ import boto3
 from typing import Optional
 from botocore.exceptions import ClientError
 from fmbench_orchestrator.utils.logger import logger
-from fmbench_orchestrator.utils.aws import get_region
-from fmbench_orchestrator.orchestrator.run import SecurityGroupConfig
-
+from typing import Dict
 
 def _get_security_group_id_by_name(region: str, group_name: str, vpc_id: int) -> str:
     """
@@ -126,11 +124,14 @@ def authorize_inbound_rules(security_group_id: str, region: str):
             logger.error(f"Error authorizing inbound rules: {e}")
 
 
-def get_sg_id(region: str) -> str:
+def get_sg_id(region: str, config_handler) -> str:
     # Append the region to the group name
-    GROUP_NAME = f"{config_data['security_group'].get('group_name')}-{region}"
-    DESCRIPTION = config_data["security_group"].get("description", " ")
-    VPC_ID = config_data["security_group"].get("vpc_id")
+    # Get security group config from config handler
+    security_group_config = config_handler.security_group
+    
+    GROUP_NAME = f"{security_group_config.group_name}-{region}"
+    DESCRIPTION = security_group_config.description
+    VPC_ID = security_group_config.vpc_id
 
     try:
         # Create or get the security group with the region-specific name

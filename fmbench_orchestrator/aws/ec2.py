@@ -1,8 +1,9 @@
 import boto3
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from fmbench_orchestrator.utils.logger import logger
-from fmbench_orchestrator.utils.constants import CONSTANTS, AMIType
+from fmbench_orchestrator.utils.constants import *
+from fmbench_orchestrator.utils.main_utils import get_latest_version
 
 
 def create_ec2_instance(
@@ -88,7 +89,7 @@ def create_ec2_instance(
                 {
                     "ResourceType": "instance",
                     "Tags": [{"Key": "Name", "Value": instance_name},
-                             {"Key": "fmbench-version", "Value": _get_latest_version(FMBENCH_PACKAGE_NAME)}],
+                             {"Key": "fmbench-version", "Value": get_latest_version()}],
                 }
             ],
         )

@@ -1,20 +1,20 @@
- """Instance management module for fmbench-orchestrator."""
+"""Instance management module for fmbench-orchestrator."""
 
 import time
 import json
 from typing import List, Dict, Tuple
 from botocore.exceptions import NoCredentialsError
 from fmbench_orchestrator.utils.logger import logger
-from fmbench_orchestrator.globals import (
+from fmbench_orchestrator.utils.aws import (
     get_iam_role,
-    get_sg_id,
-    get_key_pair,
-    create_ec2_instance,
     upload_and_run_script,
-    FMBENCH_GH_REPO,
 )
+from fmbench_orchestrator.aws.security_group import get_sg_id
+from fmbench_orchestrator.aws.ec2 import create_ec2_instance
+from fmbench_orchestrator.utils.constants import FMBENCH_GH_REPO
 from fmbench_orchestrator.schema.handler import ConfigHandler
 from fmbench_orchestrator.schema.models import InstanceDetails
+from fmbench_orchestrator.aws.key_pair import get_key_pair
 from pydantic import BaseModel
 
 
@@ -75,19 +75,18 @@ class InstanceHandler(BaseModel):
         startup_script = instance.startup_script
         logger.info(f"Region Set for instance is: {region}")
 
-        if self.config_handler.run_steps.security_group_creation:
-            logger.info("Creating Security Groups. getting them by name if they exist")
-            sg_id = get_sg_id(region)
-
         if region is None:
             raise ValueError("Region is not provided in the configuration file.")
-
-        PRIVATE_KEY_FNAME, PRIVATE_KEY_NAME = get_key_pair(region)
-
         user_data_script = self._prepare_user_data_script(
             startup_script, self.config_handler.get_hf_token(), args
         )
-
+        
+        if self.config_handler.run_steps.security_group_creation:
+            logger.info("Creating Security Groups. getting them by name if they exist")
+            sg_id = get_sg_id(region, self.config_handler)
+    
+    
+        PRIVATE_KEY_FNAME, PRIVATE_KEY_NAME = get_key_pair(region, self.config_handler)
         if instance.instance_id is None:
             self._create_new_instance(
                 instance,

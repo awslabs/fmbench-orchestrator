@@ -1,5 +1,7 @@
+import os
 import boto3
-from typing import Optional
+from pathlib import Path
+from typing import Optional, Tuple
 from botocore.exceptions import ClientError
 from fmbench_orchestrator.utils.logger import logger
 
@@ -52,7 +54,7 @@ def create_key_pair(key_name: str, region: str, delete_key_pair_if_present: bool
     return key_material
 
 
-def get_key_pair(region):
+def get_key_pair(region, config_handler) -> Tuple[str, str]:
     """
     Get or create a key pair for EC2 instances.
 
@@ -80,7 +82,7 @@ def get_key_pair(region):
         os.makedirs(key_pair_dir)
 
     # Generate the key pair name using the format: config_name-region
-    key_pair_name_configured = config_data["key_pair_gen"]["key_pair_name"]
+    key_pair_name_configured = config_handler.key_pair.key_pair_name
 
     # Generate the key pair name using the format: config_name-region
     key_pair_name = f"{key_pair_name_configured}_{region}"
@@ -88,7 +90,7 @@ def get_key_pair(region):
     private_key_fname = os.path.join(key_pair_dir, f"{key_pair_name}.pem")
 
     # Check if key pair generation is enabled
-    if config_data["run_steps"]["key_pair_generation"]:
+    if config_handler.run_steps.key_pair_generation:
         # First, check if the key pair file already exists
         if os.path.exists(private_key_fname):
             try:

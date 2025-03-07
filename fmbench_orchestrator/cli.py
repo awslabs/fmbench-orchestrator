@@ -2,7 +2,7 @@
 
 import argparse
 import logging
-from fmbench_orchestrator.utils.constants import CONSTANTS
+from fmbench_orchestrator.utils.constants import *
 from fmbench_orchestrator.utils.logger import logger
 
 
@@ -16,7 +16,7 @@ def parse_args() -> argparse.Namespace:
         type=str,
         help="Path to your Config File",
         required=False,
-        default="fmbench_orchestrator/configs/config.yml",
+        default="fmbench_orchestrator/configs/ec2.yml",
     )
     parser.add_argument(
         "--ami-mapping-file",
@@ -35,7 +35,7 @@ def parse_args() -> argparse.Namespace:
         "--infra-config-file",
         type=str,
         help="Path to the infrastructure config file",
-        default=CONSTANTS.INFRA_YML_FPATH,
+        default=INFRA_YML_FPATH,
     )
     parser.add_argument(
         "--write-bucket",
