@@ -19,7 +19,7 @@ async def deploy_benchmarking(instance_details, remote_script_path):
     benchmark_runner = BenchmarkRunner()
     await benchmark_runner.run(instance_details, remote_script_path)
 
-def cli_main():
+def main():
     args = parse_args()
     logger.info(f"main, {args} = args")
 
@@ -55,4 +55,4 @@ def cli_main():
     logger.info("all done")
 
 if __name__ == "__main__":
-    cli_main()
+    main()
