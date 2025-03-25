@@ -12,12 +12,19 @@ from fmbench_orchestrator.schema.handler import ConfigHandler
 from fmbench_orchestrator.schema.instance_handler import InstanceHandler
 from fmbench_orchestrator.core import BenchmarkRunner
 
-async def deploy_benchmarking(instance_details, remote_script_path):
+from typing import List
+from fmbench_orchestrator.schema.models import InstanceDetails, Config
+
+async def deploy_benchmarking(instance_details: List[InstanceDetails], config: Config):
     """
     Deploy and run benchmarks on the specified instances.
+    
+    Args:
+        instance_details: List of instance details with benchmark configurations
+        config: Global configuration for the benchmark run
     """
     benchmark_runner = BenchmarkRunner()
-    await benchmark_runner.run(instance_details, remote_script_path)
+    await benchmark_runner.run(instance_details, config)
 
 def main():
     args = parse_args()
@@ -43,14 +50,12 @@ def main():
     instance_handler.deploy_instances(args)
     instance_handler.wait_for_instances()
 
-    # Generate instance details from the Pydantic models
-    instance_details = [
-        details.model_dump()
-        for details in instance_handler.instance_details_map.values()
-    ]
-    # Runs fmbench on the instances in parallel
+    # Runs fmbench on the instances in parallel using typed Pydantic models
     asyncio.run(
-        deploy_benchmarking(instance_details, config_handler)
+        deploy_benchmarking(
+            list(instance_handler.instance_details_map.values()),
+            config_handler.config
+        )
     )
     logger.info("all done")
 
